@@ -59,7 +59,8 @@ public class Program
         }
 
         app.UseMiddleware<ExceptionHandlingMiddleware>();
-        if (app.Environment.IsDevelopment())
+        var enableSwagger = app.Configuration.GetValue<bool>("Swagger:Enabled") || app.Environment.IsDevelopment();
+        if (enableSwagger)
         {
             app.UseSwagger();
             app.UseSwaggerUI(options => options.SwaggerEndpoint("/swagger/v1/swagger.json", "HM API v1"));

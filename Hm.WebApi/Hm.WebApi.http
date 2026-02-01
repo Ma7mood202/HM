@@ -1,6 +1,6 @@
 @Hm.WebApi_HostAddress = http://localhost:5232
 
-GET {{Hm.WebApi_HostAddress}}/weatherforecast/
+GET {{Hm.WebApi_HostAddress}}/swagger/v1/swagger.json
 Accept: application/json
 
 ###
