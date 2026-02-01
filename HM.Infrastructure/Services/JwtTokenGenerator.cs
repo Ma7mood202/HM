@@ -28,7 +28,7 @@ public sealed class JwtTokenGenerator
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var expiration = DateTime.UtcNow.AddMinutes(expirationMinutes);
+        var expiration = DateTime.Now.AddMinutes(expirationMinutes);
 
         var claims = new List<Claim>
         {

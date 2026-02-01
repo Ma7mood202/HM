@@ -20,8 +20,8 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
-        await _authService.RegisterAsync(request, cancellationToken);
-        return Ok();
+        var result = await _authService.RegisterAsync(request, cancellationToken);
+        return Ok(result);
     }
 
     [HttpPost("login")]
@@ -44,31 +44,31 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> ResendOtp([FromBody] ResendOtpRequest request, CancellationToken cancellationToken)
     {
-        await _authService.ResendOtpAsync(request, cancellationToken);
-        return Ok();
+        var result = await _authService.ResendOtpAsync(request, cancellationToken);
+        return Ok(result);
     }
 
     [HttpPost("forgot-password")]
     [AllowAnonymous]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
     {
-        await _authService.ForgotPasswordAsync(request, cancellationToken);
-        return Ok();
+        var result = await _authService.ForgotPasswordAsync(request, cancellationToken);
+        return Ok(result);
     }
 
     [HttpPost("reset-password")]
     [AllowAnonymous]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
     {
-        await _authService.ResetPasswordAsync(request, cancellationToken);
-        return Ok();
-    }
-
-    [HttpPost("driver/accept-invitation")]
-    [AllowAnonymous]
-    public async Task<IActionResult> AcceptDriverInvitation([FromQuery] string token, [FromBody] RegisterRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _authService.AcceptDriverInvitationAsync(token, request, cancellationToken);
+        var result = await _authService.ResetPasswordAsync(request, cancellationToken);
         return Ok(result);
     }
+
+    //[HttpPost("driver/accept-invitation")]
+    //[AllowAnonymous]
+    //public async Task<IActionResult> AcceptDriverInvitation([FromQuery] string token, [FromBody] RegisterRequest request, CancellationToken cancellationToken)
+    //{
+    //    var result = await _authService.AcceptDriverInvitationAsync(token, request, cancellationToken);
+    //    return Ok(result);
+    //}
 }

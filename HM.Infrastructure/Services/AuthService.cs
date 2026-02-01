@@ -1,4 +1,5 @@
 using HM.Application.Common.DTOs.Auth;
+using HM.Application.Common.Models;
 using HM.Application.Interfaces.Persistence;
 using HM.Application.Interfaces.Services;
 using HM.Domain.Entities;
@@ -36,7 +37,7 @@ public sealed class AuthService : IAuthService
         _configuration = configuration;
     }
 
-    public async Task RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
+    public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
         var existingUser = await _userManager.FindByNameAsync(request.PhoneNumber);
         if (existingUser != null)
@@ -68,7 +69,7 @@ public sealed class AuthService : IAuthService
             IsActive = true,
             IsOtpVerified = false,
             OtpPurpose = OtpPurpose.Verification,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         };
         SetOtp(domainUser, OtpPurpose.Verification);
         _db.Users.Add(domainUser);
@@ -81,7 +82,7 @@ public sealed class AuthService : IAuthService
                 UserId = domainUser.Id,
                 CompanyName = request.CompanyName,
                 IsVerified = false,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             });
         }
         else if (request.UserType == UserType.TruckAccount)
@@ -92,7 +93,7 @@ public sealed class AuthService : IAuthService
                 UserId = domainUser.Id,
                 DisplayName = request.DisplayName ?? request.FullName,
                 IsAvailable = true,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             });
         }
         else if (request.UserType == UserType.Driver)
@@ -103,7 +104,7 @@ public sealed class AuthService : IAuthService
                 UserId = domainUser.Id,
                 FullName = request.FullName,
                 IsVerified = false,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             });
         }
 
@@ -111,6 +112,14 @@ public sealed class AuthService : IAuthService
         await _userManager.AddToRoleAsync(appUser, roleName);
 
         await _db.SaveChangesAsync(cancellationToken);
+
+        return new RegisterResponse
+        {
+            Success = true,
+            Message = "Registration successful. Please verify your phone with the OTP sent.",
+            RequiresOtpVerification = true,
+            UserId = domainUser.Id
+        };
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
@@ -163,7 +172,7 @@ public sealed class AuthService : IAuthService
         if (user.OtpPurpose != OtpPurpose.Verification)
             throw new InvalidOperationException("No pending OTP verification for this account.");
 
-        if (string.IsNullOrEmpty(user.OtpCode) || user.OtpExpiresAt == null || user.OtpExpiresAt < DateTime.UtcNow)
+        if (string.IsNullOrEmpty(user.OtpCode) || user.OtpExpiresAt == null || user.OtpExpiresAt < DateTime.Now)
             throw new InvalidOperationException("OTP has expired. Please request a new one.");
 
         if (user.OtpCode != request.OtpCode)
@@ -186,7 +195,7 @@ public sealed class AuthService : IAuthService
         };
     }
 
-    public async Task ResendOtpAsync(ResendOtpRequest request, CancellationToken cancellationToken = default)
+    public async Task<MessageResponse> ResendOtpAsync(ResendOtpRequest request, CancellationToken cancellationToken = default)
     {
         var appUser = await _userManager.FindByNameAsync(request.PhoneNumber);
         if (appUser == null)
@@ -201,9 +210,15 @@ public sealed class AuthService : IAuthService
 
         SetOtp(user, OtpPurpose.Verification);
         await _db.SaveChangesAsync(cancellationToken);
+
+        return new MessageResponse
+        {
+            Success = true,
+            Message = "OTP has been resent. Please check your phone."
+        };
     }
 
-    public async Task ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
+    public async Task<MessageResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
     {
         var appUser = await _userManager.FindByNameAsync(request.PhoneNumber);
         if (appUser == null)
@@ -215,9 +230,15 @@ public sealed class AuthService : IAuthService
 
         SetOtp(user, OtpPurpose.PasswordReset);
         await _db.SaveChangesAsync(cancellationToken);
+
+        return new MessageResponse
+        {
+            Success = true,
+            Message = "If an account exists for this phone number, a password reset code has been sent."
+        };
     }
 
-    public async Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default)
+    public async Task<MessageResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default)
     {
         var appUser = await _userManager.FindByNameAsync(request.PhoneNumber);
         if (appUser == null)
@@ -230,7 +251,7 @@ public sealed class AuthService : IAuthService
         if (user.OtpPurpose != OtpPurpose.PasswordReset)
             throw new InvalidOperationException("No pending password reset OTP. Please request a new one.");
 
-        if (string.IsNullOrEmpty(user.OtpCode) || user.OtpExpiresAt == null || user.OtpExpiresAt < DateTime.UtcNow)
+        if (string.IsNullOrEmpty(user.OtpCode) || user.OtpExpiresAt == null || user.OtpExpiresAt < DateTime.Now)
             throw new InvalidOperationException("OTP has expired. Please request a new one.");
 
         if (user.OtpCode != request.OtpCode)
@@ -245,12 +266,18 @@ public sealed class AuthService : IAuthService
         user.OtpExpiresAt = null;
         user.OtpPurpose = OtpPurpose.None;
         await _db.SaveChangesAsync(cancellationToken);
+
+        return new MessageResponse
+        {
+            Success = true,
+            Message = "Your password has been reset successfully. You can now log in with your new password."
+        };
     }
 
     public async Task<AuthResponse> AcceptDriverInvitationAsync(string token, RegisterRequest request, CancellationToken cancellationToken = default)
     {
         var invitation = await _db.DriverInvitations
-            .FirstOrDefaultAsync(i => i.Token == token && !i.IsUsed && i.ExpiresAt > DateTime.UtcNow, cancellationToken);
+            .FirstOrDefaultAsync(i => i.Token == token && !i.IsUsed && i.ExpiresAt > DateTime.Now, cancellationToken);
         if (invitation == null)
             throw new InvalidOperationException("Invalid or expired invitation token.");
 
@@ -284,7 +311,7 @@ public sealed class AuthService : IAuthService
             IsActive = true,
             IsOtpVerified = false,
             OtpPurpose = OtpPurpose.Verification,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         };
         SetOtp(domainUser, OtpPurpose.Verification);
         _db.Users.Add(domainUser);
@@ -295,7 +322,7 @@ public sealed class AuthService : IAuthService
             UserId = domainUser.Id,
             FullName = request.FullName,
             IsVerified = false,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         };
         _db.DriverProfiles.Add(driverProfile);
 
@@ -322,7 +349,7 @@ public sealed class AuthService : IAuthService
     private void SetOtp(User user, OtpPurpose purpose)
     {
         user.OtpCode = GenerateOtp();
-        user.OtpExpiresAt = DateTime.UtcNow.Add(OtpExpiry);
+        user.OtpExpiresAt = DateTime.Now.Add(OtpExpiry);
         user.OtpPurpose = purpose;
     }
 

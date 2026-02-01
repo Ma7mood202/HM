@@ -84,7 +84,7 @@ public sealed class TruckService : ITruckService
         if (shipmentRequest.Status != ShipmentRequestStatus.Open)
             throw new InvalidOperationException("Shipment request is no longer open.");
 
-        var expirationAt = request.ExpirationAt ?? DateTime.UtcNow.AddDays(7);
+        var expirationAt = request.ExpirationAt ?? DateTime.Now.AddDays(7);
 
         var offer = new ShipmentOffer
         {
@@ -94,7 +94,7 @@ public sealed class TruckService : ITruckService
             Price = request.Price,
             Notes = request.Notes,
             Status = ShipmentOfferStatus.Pending,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.Now,
             ExpirationAt = expirationAt
         };
         _db.ShipmentOffers.Add(offer);
@@ -136,7 +136,7 @@ public sealed class TruckService : ITruckService
                 UserId = user.Id,
                 FullName = user.FullName,
                 IsVerified = false,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
             _db.DriverProfiles.Add(driverProfile);
             await _db.SaveChangesAsync(cancellationToken);
@@ -165,9 +165,9 @@ public sealed class TruckService : ITruckService
             Id = Guid.NewGuid(),
             ShipmentId = shipmentId,
             Token = token,
-            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            ExpiresAt = DateTime.Now.AddDays(7),
             IsUsed = false,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         };
         _db.DriverInvitations.Add(invitation);
         await _db.SaveChangesAsync(cancellationToken);
@@ -236,7 +236,7 @@ public sealed class TruckService : ITruckService
                 Price = off?.Price ?? 0,
                 DriverName = driver?.FullName,
                 TruckPlateNumber = truck?.PlateNumber,
-                CreatedAt = req?.CreatedAt ?? DateTime.UtcNow
+                CreatedAt = req?.CreatedAt ?? DateTime.Now
             };
         }).ToList();
 

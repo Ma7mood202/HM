@@ -43,11 +43,11 @@ public sealed class DriverService : IDriverService
             throw new InvalidOperationException("Shipment is not ready to start.");
 
         shipment.Status = ShipmentStatus.InTransit;
-        shipment.StartedAt = DateTime.UtcNow;
+        shipment.StartedAt = DateTime.Now;
         await _db.SaveChangesAsync(cancellationToken);
 
         var dto = _mapper.Map<ShipmentStatusDto>(shipment);
-        dto.UpdatedAt = DateTime.UtcNow;
+        dto.UpdatedAt = DateTime.Now;
         return dto;
     }
 
@@ -63,7 +63,7 @@ public sealed class DriverService : IDriverService
         await _db.SaveChangesAsync(cancellationToken);
 
         var dto = _mapper.Map<ShipmentStatusDto>(shipment);
-        dto.UpdatedAt = DateTime.UtcNow;
+        dto.UpdatedAt = DateTime.Now;
         return dto;
     }
 
@@ -76,11 +76,11 @@ public sealed class DriverService : IDriverService
             throw new InvalidOperationException("Shipment cannot be completed in current status.");
 
         shipment.Status = ShipmentStatus.Completed;
-        shipment.CompletedAt = DateTime.UtcNow;
+        shipment.CompletedAt = DateTime.Now;
         await _db.SaveChangesAsync(cancellationToken);
 
         var dto = _mapper.Map<ShipmentStatusDto>(shipment);
-        dto.UpdatedAt = DateTime.UtcNow;
+        dto.UpdatedAt = DateTime.Now;
         return dto;
     }
 

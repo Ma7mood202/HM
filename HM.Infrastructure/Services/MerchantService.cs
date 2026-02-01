@@ -30,7 +30,7 @@ public sealed class MerchantService : IMerchantService
         entity.Id = Guid.NewGuid();
         entity.MerchantProfileId = merchantProfileId;
         entity.Status = ShipmentRequestStatus.Open;
-        entity.CreatedAt = DateTime.UtcNow;
+        entity.CreatedAt = DateTime.Now;
 
         _db.ShipmentRequests.Add(entity);
         await _db.SaveChangesAsync(cancellationToken);
