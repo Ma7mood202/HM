@@ -1,5 +1,4 @@
 using HM.Application.Common.DTOs.Merchant;
-using HM.Application.Common.DTOs.Shipment;
 using HM.Application.Common.Models;
 
 namespace HM.Application.Interfaces.Services;
@@ -9,28 +8,21 @@ namespace HM.Application.Interfaces.Services;
 /// </summary>
 public interface IMerchantService
 {
-    /// <summary>
-    /// Creates a new shipment request.
-    /// </summary>
-    Task<ShipmentRequestDto> CreateShipmentRequestAsync(Guid merchantProfileId, CreateShipmentRequestDto request, CancellationToken cancellationToken = default);
+    Task<MerchantProfileResponse> GetMyProfileAsync(Guid userId, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Gets all shipment requests for a merchant.
-    /// </summary>
-    Task<PaginatedResult<ShipmentRequestDto>> GetMyShipmentRequestsAsync(Guid merchantProfileId, PaginationRequest pagination, CancellationToken cancellationToken = default);
+    Task<MerchantProfileResponse> UpdateMyProfileAsync(Guid userId, UpdateMerchantProfileRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Gets all offers for a specific shipment request.
-    /// </summary>
-    Task<PaginatedResult<ShipmentOfferDto>> GetShipmentOffersAsync(Guid merchantProfileId, Guid shipmentRequestId, PaginationRequest pagination, CancellationToken cancellationToken = default);
+    Task<ShipmentRequestDetailsResponse> CreateShipmentRequestAsync(Guid userId, CreateShipmentRequestRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Accepts an offer for a shipment request.
-    /// </summary>
-    Task<ShipmentDetailsDto> AcceptOfferAsync(Guid merchantProfileId, Guid offerId, CancellationToken cancellationToken = default);
+    Task<PaginatedResult<ShipmentRequestSummaryResponse>> GetMyShipmentRequestsAsync(Guid userId, GetMerchantShipmentRequestsQuery query, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Gets tracking information for a shipment.
-    /// </summary>
-    Task<ShipmentTrackingDto> GetShipmentTrackingAsync(Guid merchantProfileId, Guid shipmentId, CancellationToken cancellationToken = default);
+    Task<ShipmentRequestDetailsResponse> GetMyShipmentRequestDetailsAsync(Guid userId, Guid shipmentRequestId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ShipmentOfferResponse>> GetOffersForMyRequestAsync(Guid userId, Guid shipmentRequestId, CancellationToken cancellationToken = default);
+
+    Task<ShipmentRequestDetailsResponse> AcceptOfferAsync(Guid userId, Guid shipmentRequestId, Guid offerId, CancellationToken cancellationToken = default);
+
+    Task CancelShipmentRequestAsync(Guid userId, Guid shipmentRequestId, CancellationToken cancellationToken = default);
+
+    Task<ShipmentTrackingResponse> GetTrackingAsync(Guid userId, Guid shipmentIdOrRequestId, CancellationToken cancellationToken = default);
 }

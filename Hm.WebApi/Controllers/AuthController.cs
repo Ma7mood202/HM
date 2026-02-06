@@ -1,5 +1,6 @@
 using HM.Application.Common.DTOs.Auth;
 using HM.Application.Interfaces.Services;
+using Hm.WebApi.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,6 +15,17 @@ public class AuthController : ControllerBase
     public AuthController(IAuthService authService)
     {
         _authService = authService;
+    }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId == null)
+            return Unauthorized();
+        await _authService.ChangePasswordAsync(userId.Value, request, cancellationToken);
+        return NoContent();
     }
 
     [HttpPost("register")]
@@ -64,11 +76,11 @@ public class AuthController : ControllerBase
         return Ok(result);
     }
 
-    //[HttpPost("driver/accept-invitation")]
-    //[AllowAnonymous]
-    //public async Task<IActionResult> AcceptDriverInvitation([FromQuery] string token, [FromBody] RegisterRequest request, CancellationToken cancellationToken)
-    //{
-    //    var result = await _authService.AcceptDriverInvitationAsync(token, request, cancellationToken);
-    //    return Ok(result);
-    //}
+    [HttpPost("driver/accept-invitation")]
+    [AllowAnonymous]
+    public async Task<IActionResult> AcceptDriverInvitation([FromQuery] string token, [FromBody] RegisterRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _authService.AcceptDriverInvitationAsync(token, request, cancellationToken);
+        return Ok(result);
+    }
 }

@@ -238,6 +238,26 @@ public sealed class AuthService : IAuthService
         };
     }
 
+    public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword))
+            throw new InvalidOperationException("Current password is required.");
+        if (string.IsNullOrWhiteSpace(request.NewPassword))
+            throw new InvalidOperationException("New password is required.");
+
+        var appUser = await _userManager.FindByIdAsync(userId.ToString());
+        if (appUser == null)
+            throw new UnauthorizedAccessException("User not found.");
+
+        var check = await _userManager.CheckPasswordAsync(appUser, request.CurrentPassword);
+        if (!check)
+            throw new InvalidOperationException("Current password is incorrect.");
+
+        var result = await _userManager.ChangePasswordAsync(appUser, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+            throw new InvalidOperationException(string.Join("; ", result.Errors.Select(e => e.Description)));
+    }
+
     public async Task<MessageResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default)
     {
         var appUser = await _userManager.FindByNameAsync(request.PhoneNumber);

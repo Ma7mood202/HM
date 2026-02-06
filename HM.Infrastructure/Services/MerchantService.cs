@@ -1,6 +1,5 @@
 using AutoMapper;
 using HM.Application.Common.DTOs.Merchant;
-using HM.Application.Common.DTOs.Shipment;
 using HM.Application.Common.Models;
 using HM.Application.Interfaces.Persistence;
 using HM.Application.Interfaces.Services;
@@ -11,10 +10,11 @@ using Microsoft.EntityFrameworkCore;
 namespace HM.Infrastructure.Services;
 
 /// <summary>
-/// Merchant operations: shipment requests, offers, accept offer, tracking.
+/// Merchant operations: profile, shipment requests (wizard), offers, accept/cancel, tracking.
 /// </summary>
 public sealed class MerchantService : IMerchantService
 {
+    private static readonly Random Rng = new();
     private readonly IApplicationDbContext _db;
     private readonly IMapper _mapper;
 
@@ -24,113 +24,250 @@ public sealed class MerchantService : IMerchantService
         _mapper = mapper;
     }
 
-    public async Task<ShipmentRequestDto> CreateShipmentRequestAsync(Guid merchantProfileId, CreateShipmentRequestDto request, CancellationToken cancellationToken = default)
+    public async Task<MerchantProfileResponse> GetMyProfileAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var entity = _mapper.Map<ShipmentRequest>(request);
-        entity.Id = Guid.NewGuid();
-        entity.MerchantProfileId = merchantProfileId;
-        entity.Status = ShipmentRequestStatus.Open;
-        entity.CreatedAt = DateTime.Now;
+        var profile = await _db.MerchantProfiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+        if (profile == null)
+            throw new KeyNotFoundException("Merchant profile not found.");
 
+        var user = await _db.Users.FindAsync([userId], cancellationToken);
+        if (user == null)
+            throw new KeyNotFoundException("User not found.");
+
+        return new MerchantProfileResponse
+        {
+            Id = profile.Id,
+            FullName = user.FullName,
+            PhoneNumber = user.PhoneNumber,
+            AvatarUrl = profile.AvatarUrl,
+            CreatedAt = profile.CreatedAt
+        };
+    }
+
+    public async Task<MerchantProfileResponse> UpdateMyProfileAsync(Guid userId, UpdateMerchantProfileRequest request, CancellationToken cancellationToken = default)
+    {
+        var profile = await _db.MerchantProfiles
+            .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+        if (profile == null)
+            throw new KeyNotFoundException("Merchant profile not found.");
+
+        var user = await _db.Users.FindAsync([userId], cancellationToken);
+        if (user == null)
+            throw new KeyNotFoundException("User not found.");
+
+        if (string.IsNullOrWhiteSpace(request.FullName))
+            throw new InvalidOperationException("Full name is required.");
+
+        user.FullName = request.FullName.Trim();
+        profile.AvatarUrl = request.AvatarUrl?.Trim();
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return new MerchantProfileResponse
+        {
+            Id = profile.Id,
+            FullName = user.FullName,
+            PhoneNumber = user.PhoneNumber,
+            AvatarUrl = profile.AvatarUrl,
+            CreatedAt = profile.CreatedAt
+        };
+    }
+
+    public async Task<ShipmentRequestDetailsResponse> CreateShipmentRequestAsync(Guid userId, CreateShipmentRequestRequest request, CancellationToken cancellationToken = default)
+    {
+        var profile = await _db.MerchantProfiles
+            .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+        if (profile == null)
+            throw new KeyNotFoundException("Merchant profile not found.");
+
+        ValidateCreateRequest(request);
+
+        var cargoDesc = (request.ParcelDescription ?? request.ParcelType ?? "").Trim();
+        if (string.IsNullOrEmpty(cargoDesc))
+            cargoDesc = "Parcel";
+
+        var entity = new ShipmentRequest
+        {
+            Id = Guid.NewGuid(),
+            MerchantProfileId = profile.Id,
+            RequestNumber = await GenerateUniqueRequestNumberAsync(cancellationToken),
+            RequiredTruckType = request.TruckType,
+
+            PickupLocation = request.PickupAddressText.Trim(),
+            PickupArea = request.PickupArea?.Trim(),
+            PickupLat = request.PickupLat,
+            PickupLng = request.PickupLng,
+
+            DropoffLocation = request.DropoffAddressText.Trim(),
+            DropoffArea = request.DropoffArea?.Trim(),
+            DropoffLat = request.DropoffLat,
+            DropoffLng = request.DropoffLng,
+
+            SenderName = request.SenderName.Trim(),
+            SenderPhone = request.SenderPhone.Trim(),
+
+            CargoDescription = cargoDesc,
+            ParcelType = request.ParcelType?.Trim(),
+            EstimatedWeight = request.ParcelWeightKg,
+            ParcelSize = request.ParcelSize?.Trim(),
+            ParcelCount = request.ParcelCount,
+
+            DeliveryDate = request.DeliveryDate,
+            DeliveryTimeFrom = request.DeliveryTimeFrom,
+            DeliveryTimeTo = request.DeliveryTimeTo,
+
+            PaymentMethod = request.PaymentMethod,
+            Notes = request.Notes?.Trim(),
+            Status = ShipmentRequestStatus.Open,
+            CreatedAt = DateTime.UtcNow
+        };
         _db.ShipmentRequests.Add(entity);
         await _db.SaveChangesAsync(cancellationToken);
 
-        var dto = _mapper.Map<ShipmentRequestDto>(entity);
-        dto.OffersCount = 0;
-        return dto;
+        return await BuildDetailsResponseAsync(profile.Id, entity.Id, cancellationToken);
     }
 
-    public async Task<PaginatedResult<ShipmentRequestDto>> GetMyShipmentRequestsAsync(Guid merchantProfileId, PaginationRequest pagination, CancellationToken cancellationToken = default)
+    public async Task<PaginatedResult<ShipmentRequestSummaryResponse>> GetMyShipmentRequestsAsync(Guid userId, GetMerchantShipmentRequestsQuery query, CancellationToken cancellationToken = default)
     {
-        var query = _db.ShipmentRequests
-            .Where(r => r.MerchantProfileId == merchantProfileId)
-            .OrderByDescending(r => r.CreatedAt);
+        var profileId = await ResolveMerchantProfileIdAsync(userId, cancellationToken);
 
-        var total = await query.CountAsync(cancellationToken);
+        var q = _db.ShipmentRequests
+            .AsNoTracking()
+            .Where(r => r.MerchantProfileId == profileId);
 
-        var items = await query
-            .Skip((pagination.PageNumber - 1) * pagination.PageSize)
-            .Take(pagination.PageSize)
+        if (query.Status.HasValue)
+            q = q.Where(r => r.Status == query.Status.Value);
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim();
+            q = q.Where(r => r.RequestNumber.Contains(search));
+        }
+
+        if (query.DateFrom.HasValue)
+            q = q.Where(r => r.CreatedAt >= query.DateFrom.Value.ToDateTime(TimeOnly.MinValue));
+        if (query.DateTo.HasValue)
+            q = q.Where(r => r.CreatedAt <= query.DateTo.Value.ToDateTime(TimeOnly.MaxValue));
+
+        q = q.OrderByDescending(r => r.CreatedAt);
+
+        var total = await q.CountAsync(cancellationToken);
+        var pageNumber = query.PageNumber < 1 ? 1 : query.PageNumber;
+        var pageSize = query.PageSize < 1 ? 10 : Math.Min(query.PageSize, 50);
+
+        var items = await q
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+        var requestIds = items.Select(i => i.Id).ToList();
         var offerCounts = await _db.ShipmentOffers
-            .Where(o => items.Select(i => i.Id).Contains(o.ShipmentRequestId))
+            .Where(o => requestIds.Contains(o.ShipmentRequestId))
             .GroupBy(o => o.ShipmentRequestId)
             .Select(g => new { RequestId = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
-
         var countLookup = offerCounts.ToDictionary(x => x.RequestId, x => x.Count);
 
-        var dtos = items.Select(r =>
+        var summaries = items.Select(r =>
         {
-            var dto = _mapper.Map<ShipmentRequestDto>(r);
-            dto.OffersCount = countLookup.GetValueOrDefault(r.Id, 0);
-            return dto;
+            var from = r.DeliveryTimeFrom;
+            var to = r.DeliveryTimeTo;
+            var timeWindow = (from.HasValue || to.HasValue)
+                ? $"{(from.HasValue ? from.Value.ToString("hh\\:mm") : "?")} - {(to.HasValue ? to.Value.ToString("hh\\:mm") : "?")}"
+                : "";
+
+            return new ShipmentRequestSummaryResponse
+            {
+                Id = r.Id,
+                RequestNumber = r.RequestNumber,
+                Status = r.Status,
+                TruckType = r.RequiredTruckType,
+                CreatedAt = r.CreatedAt,
+                PickupAreaOrText = r.PickupArea ?? r.PickupLocation,
+                DropoffAreaOrText = r.DropoffArea ?? r.DropoffLocation,
+                DeliveryDate = r.DeliveryDate,
+                DeliveryTimeWindow = timeWindow,
+                OffersCount = countLookup.GetValueOrDefault(r.Id, 0)
+            };
         }).ToList();
 
-        return new PaginatedResult<ShipmentRequestDto>
+        return new PaginatedResult<ShipmentRequestSummaryResponse>
         {
-            Items = dtos,
-            PageNumber = pagination.PageNumber,
-            PageSize = pagination.PageSize,
+            Items = summaries,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
             TotalCount = total
         };
     }
 
-    public async Task<PaginatedResult<ShipmentOfferDto>> GetShipmentOffersAsync(Guid merchantProfileId, Guid shipmentRequestId, PaginationRequest pagination, CancellationToken cancellationToken = default)
+    public async Task<ShipmentRequestDetailsResponse> GetMyShipmentRequestDetailsAsync(Guid userId, Guid shipmentRequestId, CancellationToken cancellationToken = default)
     {
+        var profileId = await ResolveMerchantProfileIdAsync(userId, cancellationToken);
+        return await BuildDetailsResponseAsync(profileId, shipmentRequestId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ShipmentOfferResponse>> GetOffersForMyRequestAsync(Guid userId, Guid shipmentRequestId, CancellationToken cancellationToken = default)
+    {
+        var profileId = await ResolveMerchantProfileIdAsync(userId, cancellationToken);
+
         var request = await _db.ShipmentRequests.FindAsync([shipmentRequestId], cancellationToken);
-        if (request == null || request.MerchantProfileId != merchantProfileId)
-            throw new InvalidOperationException("Shipment request not found.");
+        if (request == null || request.MerchantProfileId != profileId)
+            throw new KeyNotFoundException("Shipment request not found.");
 
-        var query = _db.ShipmentOffers
+        var offers = await _db.ShipmentOffers
+            .AsNoTracking()
             .Where(o => o.ShipmentRequestId == shipmentRequestId)
-            .OrderByDescending(o => o.CreatedAt);
-
-        var total = await query.CountAsync(cancellationToken);
-
-        var offers = await query
-            .Skip((pagination.PageNumber - 1) * pagination.PageSize)
-            .Take(pagination.PageSize)
+            .OrderByDescending(o => o.CreatedAt)
             .ToListAsync(cancellationToken);
 
         var truckAccountIds = offers.Select(o => o.TruckAccountId).Distinct().ToList();
         var truckAccounts = await _db.TruckAccounts
+            .AsNoTracking()
             .Where(t => truckAccountIds.Contains(t.Id))
             .ToDictionaryAsync(t => t.Id, cancellationToken);
 
-        var dtos = offers.Select(o =>
-        {
-            var dto = _mapper.Map<ShipmentOfferDto>(o);
-            dto.TruckAccountName = truckAccounts.GetValueOrDefault(o.TruckAccountId)?.DisplayName ?? "";
-            return dto;
-        }).ToList();
+        var truckCounts = await _db.Trucks
+            .Where(t => truckAccountIds.Contains(t.TruckAccountId))
+            .GroupBy(t => t.TruckAccountId)
+            .Select(g => new { TruckAccountId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+        var truckCountLookup = truckCounts.ToDictionary(x => x.TruckAccountId, x => x.Count);
 
-        return new PaginatedResult<ShipmentOfferDto>
+        return offers.Select(o =>
         {
-            Items = dtos,
-            PageNumber = pagination.PageNumber,
-            PageSize = pagination.PageSize,
-            TotalCount = total
-        };
+            var acc = truckAccounts.GetValueOrDefault(o.TruckAccountId);
+            return new ShipmentOfferResponse
+            {
+                OfferId = o.Id,
+                TruckAccountId = o.TruckAccountId,
+                Price = o.Price,
+                Currency = "SAR",
+                Notes = o.Notes,
+                CreatedAt = o.CreatedAt,
+                TruckAccountName = acc?.DisplayName ?? "",
+                TrucksCount = truckCountLookup.GetValueOrDefault(o.TruckAccountId, 0)
+            };
+        }).ToList();
     }
 
-    public async Task<ShipmentDetailsDto> AcceptOfferAsync(Guid merchantProfileId, Guid offerId, CancellationToken cancellationToken = default)
+    public async Task<ShipmentRequestDetailsResponse> AcceptOfferAsync(Guid userId, Guid shipmentRequestId, Guid offerId, CancellationToken cancellationToken = default)
     {
-        var offer = await _db.ShipmentOffers
-            .FirstOrDefaultAsync(o => o.Id == offerId, cancellationToken);
-        if (offer == null)
-            throw new InvalidOperationException("Offer not found.");
+        var profileId = await ResolveMerchantProfileIdAsync(userId, cancellationToken);
 
+        var offer = await _db.ShipmentOffers.FirstOrDefaultAsync(o => o.Id == offerId, cancellationToken);
+        if (offer == null)
+            throw new KeyNotFoundException("Offer not found.");
+        if (offer.ShipmentRequestId != shipmentRequestId)
+            throw new InvalidOperationException("Offer does not belong to this request.");
         if (offer.Status != ShipmentOfferStatus.Pending)
             throw new InvalidOperationException("Offer is no longer pending.");
 
-        var request = await _db.ShipmentRequests.FindAsync([offer.ShipmentRequestId], cancellationToken);
-        if (request == null || request.MerchantProfileId != merchantProfileId)
-            throw new InvalidOperationException("Shipment request not found.");
-
+        var request = await _db.ShipmentRequests.FindAsync([shipmentRequestId], cancellationToken);
+        if (request == null || request.MerchantProfileId != profileId)
+            throw new KeyNotFoundException("Shipment request not found.");
         if (request.Status != ShipmentRequestStatus.Open)
-            throw new InvalidOperationException("Shipment request is no longer open.");
+            throw new InvalidOperationException("Request is no longer open for acceptance.");
 
         var truck = await _db.Trucks
             .FirstOrDefaultAsync(t => t.TruckAccountId == offer.TruckAccountId && t.IsActive, cancellationToken);
@@ -148,7 +285,6 @@ public sealed class MerchantService : IMerchantService
         _db.Shipments.Add(shipment);
 
         offer.Status = ShipmentOfferStatus.Accepted;
-
         var otherOffers = await _db.ShipmentOffers
             .Where(o => o.ShipmentRequestId == request.Id && o.Id != offer.Id && o.Status == ShipmentOfferStatus.Pending)
             .ToListAsync(cancellationToken);
@@ -156,81 +292,211 @@ public sealed class MerchantService : IMerchantService
             o.Status = ShipmentOfferStatus.Rejected;
 
         request.Status = ShipmentRequestStatus.OfferAccepted;
-
         await _db.SaveChangesAsync(cancellationToken);
 
-        return await BuildShipmentDetailsDtoAsync(shipment.Id, cancellationToken);
+        return await BuildDetailsResponseAsync(profileId, request.Id, cancellationToken);
     }
 
-    public async Task<ShipmentTrackingDto> GetShipmentTrackingAsync(Guid merchantProfileId, Guid shipmentId, CancellationToken cancellationToken = default)
+    public async Task CancelShipmentRequestAsync(Guid userId, Guid shipmentRequestId, CancellationToken cancellationToken = default)
     {
-        var shipment = await _db.Shipments
-            .FirstOrDefaultAsync(s => s.Id == shipmentId, cancellationToken);
+        var profileId = await ResolveMerchantProfileIdAsync(userId, cancellationToken);
+
+        var request = await _db.ShipmentRequests.FindAsync([shipmentRequestId], cancellationToken);
+        if (request == null || request.MerchantProfileId != profileId)
+            throw new KeyNotFoundException("Shipment request not found.");
+
+        if (request.Status != ShipmentRequestStatus.Open && request.Status != ShipmentRequestStatus.Draft)
+            throw new InvalidOperationException("Only open or draft requests can be cancelled.");
+
+        request.Status = ShipmentRequestStatus.Cancelled;
+        var pendingOffers = await _db.ShipmentOffers
+            .Where(o => o.ShipmentRequestId == shipmentRequestId && o.Status == ShipmentOfferStatus.Pending)
+            .ToListAsync(cancellationToken);
+        foreach (var o in pendingOffers)
+            o.Status = ShipmentOfferStatus.Rejected;
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<ShipmentTrackingResponse> GetTrackingAsync(Guid userId, Guid shipmentIdOrRequestId, CancellationToken cancellationToken = default)
+    {
+        var profileId = await ResolveMerchantProfileIdAsync(userId, cancellationToken);
+
+        Shipment? shipment = null;
+        var byShipment = await _db.Shipments.FindAsync([shipmentIdOrRequestId], cancellationToken);
+        if (byShipment != null)
+            shipment = byShipment;
+        else
+        {
+            var byRequest = await _db.Shipments
+                .FirstOrDefaultAsync(s => s.ShipmentRequestId == shipmentIdOrRequestId, cancellationToken);
+            shipment = byRequest;
+        }
+
         if (shipment == null)
-            throw new InvalidOperationException("Shipment not found.");
+            throw new KeyNotFoundException("Shipment not found.");
 
         var request = await _db.ShipmentRequests.FindAsync([shipment.ShipmentRequestId], cancellationToken);
-        if (request == null || request.MerchantProfileId != merchantProfileId)
-            throw new InvalidOperationException("Shipment not found.");
+        if (request == null || request.MerchantProfileId != profileId)
+            throw new UnauthorizedAccessException("Shipment not found.");
 
         string? driverName = null;
+        string? driverPhone = null;
         if (shipment.DriverProfileId.HasValue)
         {
             var driver = await _db.DriverProfiles.FindAsync([shipment.DriverProfileId.Value], cancellationToken);
             if (driver != null)
+            {
                 driverName = driver.FullName;
+                var driverUser = driver.UserId.HasValue ? await _db.Users.FindAsync([driver.UserId.Value], cancellationToken) : null;
+                driverPhone = driverUser?.PhoneNumber;
+            }
         }
 
         var truck = await _db.Trucks.FindAsync([shipment.TruckId], cancellationToken);
 
-        return new ShipmentTrackingDto
+        return new ShipmentTrackingResponse
         {
             ShipmentId = shipment.Id,
             Status = shipment.Status,
-            PickupLocation = request.PickupLocation,
-            DropoffLocation = request.DropoffLocation,
+            CurrentLat = shipment.CurrentLat,
+            CurrentLng = shipment.CurrentLng,
+            RoutePolyline = null,
+            LastUpdatedAt = shipment.LocationUpdatedAt ?? shipment.StartedAt ?? shipment.CompletedAt,
             DriverName = driverName,
+            DriverPhone = driverPhone,
             TruckPlateNumber = truck?.PlateNumber,
-            StartedAt = shipment.StartedAt,
-            CompletedAt = shipment.CompletedAt
+            TruckType = truck?.TruckType
         };
     }
 
-    private async Task<ShipmentDetailsDto> BuildShipmentDetailsDtoAsync(Guid shipmentId, CancellationToken cancellationToken)
+    private async Task<Guid> ResolveMerchantProfileIdAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var shipment = await _db.Shipments.FindAsync([shipmentId], cancellationToken);
-        if (shipment == null)
-            throw new InvalidOperationException("Shipment not found.");
+        var profile = await _db.MerchantProfiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+        if (profile == null)
+            throw new KeyNotFoundException("Merchant profile not found.");
+        return profile.Id;
+    }
 
-        var request = await _db.ShipmentRequests.FindAsync([shipment.ShipmentRequestId], cancellationToken);
-        var offer = await _db.ShipmentOffers.FindAsync([shipment.AcceptedOfferId], cancellationToken);
-        var truck = await _db.Trucks.FindAsync([shipment.TruckId], cancellationToken);
-        string? driverName = null;
-        if (shipment.DriverProfileId.HasValue)
+    private static void ValidateCreateRequest(CreateShipmentRequestRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.SenderPhone))
+            throw new InvalidOperationException("Sender phone is required.");
+        if (string.IsNullOrWhiteSpace(request.PickupAddressText))
+            throw new InvalidOperationException("Pickup address is required.");
+        if (string.IsNullOrWhiteSpace(request.DropoffAddressText))
+            throw new InvalidOperationException("Dropoff address is required.");
+        if (request.ParcelCount < 1)
+            throw new InvalidOperationException("Parcel count must be at least 1.");
+        if (request.ParcelWeightKg <= 0)
+            throw new InvalidOperationException("Parcel weight must be greater than 0.");
+        if (request.DeliveryDate < DateOnly.FromDateTime(DateTime.UtcNow))
+            throw new InvalidOperationException("Delivery date cannot be in the past.");
+        if (request.DeliveryTimeFrom.HasValue && request.DeliveryTimeTo.HasValue && request.DeliveryTimeFrom > request.DeliveryTimeTo)
+            throw new InvalidOperationException("Delivery time 'from' must be before 'to'.");
+        if (!Enum.IsDefined(typeof(PaymentMethod), request.PaymentMethod))
+            throw new InvalidOperationException("Invalid payment method.");
+    }
+
+    private async Task<string> GenerateUniqueRequestNumberAsync(CancellationToken cancellationToken)
+    {
+        for (var i = 0; i < 10; i++)
         {
-            var driver = await _db.DriverProfiles.FindAsync([shipment.DriverProfileId.Value], cancellationToken);
-            driverName = driver?.FullName;
+            var code = "HM" + Rng.Next(100000, 999999).ToString();
+            var exists = await _db.ShipmentRequests.AnyAsync(r => r.RequestNumber == code, cancellationToken);
+            if (!exists)
+                return code;
+        }
+        return "HM" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+    }
+
+    private async Task<ShipmentRequestDetailsResponse> BuildDetailsResponseAsync(Guid merchantProfileId, Guid shipmentRequestId, CancellationToken cancellationToken)
+    {
+        var request = await _db.ShipmentRequests
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == shipmentRequestId && r.MerchantProfileId == merchantProfileId, cancellationToken);
+        if (request == null)
+            throw new KeyNotFoundException("Shipment request not found.");
+
+        var offersCount = await _db.ShipmentOffers.CountAsync(o => o.ShipmentRequestId == shipmentRequestId, cancellationToken);
+
+        var from = request.DeliveryTimeFrom;
+        var to = request.DeliveryTimeTo;
+        var deliveryTimeWindow = (from.HasValue || to.HasValue)
+            ? $"{(from.HasValue ? from.Value.ToString("hh\\:mm") : "?")} - {(to.HasValue ? to.Value.ToString("hh\\:mm") : "?")}"
+            : "";
+
+        AcceptedOfferSummary? acceptedOffer = null;
+        AssignedDriverSummary? assignedDriver = null;
+
+        var shipment = await _db.Shipments
+            .FirstOrDefaultAsync(s => s.ShipmentRequestId == shipmentRequestId, cancellationToken);
+        if (shipment != null)
+        {
+            var offer = await _db.ShipmentOffers.FindAsync([shipment.AcceptedOfferId], cancellationToken);
+            var truckAcc = offer != null ? await _db.TruckAccounts.FindAsync([offer.TruckAccountId], cancellationToken) : null;
+            acceptedOffer = new AcceptedOfferSummary
+            {
+                OfferId = shipment.AcceptedOfferId,
+                Price = offer?.Price ?? 0,
+                TruckAccountName = truckAcc?.DisplayName
+            };
+
+            var truck = await _db.Trucks.FindAsync([shipment.TruckId], cancellationToken);
+            if (shipment.DriverProfileId.HasValue)
+            {
+                var driver = await _db.DriverProfiles.FindAsync([shipment.DriverProfileId.Value], cancellationToken);
+                string? driverPhone = null;
+                if (driver?.UserId != null)
+                {
+                    var du = await _db.Users.FindAsync([driver.UserId.Value], cancellationToken);
+                    driverPhone = du?.PhoneNumber;
+                }
+                assignedDriver = new AssignedDriverSummary
+                {
+                    DriverName = driver?.FullName,
+                    DriverPhone = driverPhone,
+                    TruckPlateNumber = truck?.PlateNumber
+                };
+            }
+            else
+            {
+                assignedDriver = new AssignedDriverSummary { TruckPlateNumber = truck?.PlateNumber };
+            }
         }
 
-        return new ShipmentDetailsDto
+        return new ShipmentRequestDetailsResponse
         {
-            Id = shipment.Id,
-            ShipmentRequestId = shipment.ShipmentRequestId,
-            AcceptedOfferId = shipment.AcceptedOfferId,
-            TruckId = shipment.TruckId,
-            DriverProfileId = shipment.DriverProfileId,
-            PickupLocation = request?.PickupLocation ?? "",
-            DropoffLocation = request?.DropoffLocation ?? "",
-            CargoDescription = request?.CargoDescription ?? "",
-            RequiredTruckType = request?.RequiredTruckType ?? default,
-            EstimatedWeight = request?.EstimatedWeight ?? 0,
-            Notes = request?.Notes,
-            Price = offer?.Price ?? 0,
-            TruckPlateNumber = truck?.PlateNumber ?? "",
-            DriverName = driverName,
-            Status = shipment.Status,
-            StartedAt = shipment.StartedAt,
-            CompletedAt = shipment.CompletedAt
+            Id = request.Id,
+            RequestNumber = request.RequestNumber,
+            Status = request.Status,
+            TruckType = request.RequiredTruckType,
+            CreatedAt = request.CreatedAt,
+            PickupAddressText = request.PickupLocation,
+            PickupArea = request.PickupArea,
+            PickupLat = request.PickupLat,
+            PickupLng = request.PickupLng,
+            DropoffAddressText = request.DropoffLocation,
+            DropoffArea = request.DropoffArea,
+            DropoffLat = request.DropoffLat,
+            DropoffLng = request.DropoffLng,
+            SenderName = request.SenderName,
+            SenderPhone = request.SenderPhone,
+            ParcelDescription = request.CargoDescription,
+            ParcelType = request.ParcelType,
+            ParcelWeightKg = request.EstimatedWeight,
+            ParcelSize = request.ParcelSize,
+            ParcelCount = request.ParcelCount,
+            DeliveryDate = request.DeliveryDate,
+            DeliveryTimeFrom = request.DeliveryTimeFrom,
+            DeliveryTimeTo = request.DeliveryTimeTo,
+            DeliveryTimeWindow = deliveryTimeWindow,
+            PaymentMethod = request.PaymentMethod,
+            Notes = request.Notes,
+            OffersCount = offersCount,
+            AcceptedOffer = acceptedOffer,
+            AssignedDriver = assignedDriver
         };
     }
 }

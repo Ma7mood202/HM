@@ -9,6 +9,10 @@ namespace HM.Application.Interfaces.Services;
 public interface IAuthService
 {
     /// <summary>
+    /// Changes password for the authenticated user (current password required).
+    /// </summary>
+    Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken = default);
+    /// <summary>
     /// Registers a new user and generates OTP (expires in 5 minutes). OTP verification required before login.
     /// </summary>
     Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default);

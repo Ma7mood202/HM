@@ -32,4 +32,29 @@ public interface IDriverService
     /// Gets the assigned shipment details (without price information).
     /// </summary>
     Task<AssignedShipmentDto> GetAssignedShipmentAsync(Guid driverProfileId, Guid shipmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets full shipment details for the driver details screen (by current user id).
+    /// </summary>
+    Task<DriverShipmentDetailsResponse> GetMyShipmentDetailsAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Start trip ("بدأ الرحلة"). Allowed when AwaitingDriver or Ready → InTransit.
+    /// </summary>
+    Task<DriverShipmentDetailsResponse> StartTripAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Mark arrived ("تم الوصول"). Allowed when InTransit → Arrived.
+    /// </summary>
+    Task<DriverShipmentDetailsResponse> MarkArrivedAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Mark received/completed ("استلامة"). Allowed when Arrived → Completed.
+    /// </summary>
+    Task<DriverShipmentDetailsResponse> MarkReceivedAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets minimal tracking data for the shipment (location if stored).
+    /// </summary>
+    Task<DriverShipmentTrackingResponse> GetMyShipmentTrackingAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default);
 }

@@ -1,5 +1,4 @@
 using HM.Application.Common.DTOs.Merchant;
-using HM.Application.Common.Models;
 using HM.Application.Interfaces.Services;
 using HM.Domain.Enums;
 using Hm.WebApi.Extensions;
@@ -14,64 +13,105 @@ namespace Hm.WebApi.Controllers;
 public class MerchantController : ControllerBase
 {
     private readonly IMerchantService _merchantService;
-    private readonly ICurrentProfileAccessor _profileAccessor;
 
-    public MerchantController(IMerchantService merchantService, ICurrentProfileAccessor profileAccessor)
+    public MerchantController(IMerchantService merchantService)
     {
         _merchantService = merchantService;
-        _profileAccessor = profileAccessor;
     }
 
-    private async Task<Guid> GetMerchantProfileIdAsync(CancellationToken cancellationToken)
+    private Guid GetUserId()
     {
         var userId = User.GetUserId();
         if (userId == null)
             throw new UnauthorizedAccessException("User identifier not found.");
-        var profileId = await _profileAccessor.GetMerchantProfileIdAsync(userId.Value, cancellationToken);
-        if (profileId == null)
-            throw new UnauthorizedAccessException("Merchant profile not found.");
-        return profileId.Value;
+        return userId.Value;
     }
 
-    [HttpPost("shipments")]
-    public async Task<IActionResult> CreateShipment([FromBody] CreateShipmentRequestDto request, CancellationToken cancellationToken)
+    [HttpGet("profile")]
+    public async Task<IActionResult> GetProfile(CancellationToken cancellationToken)
     {
-        var merchantProfileId = await GetMerchantProfileIdAsync(cancellationToken);
-        var result = await _merchantService.CreateShipmentRequestAsync(merchantProfileId, request, cancellationToken);
+        var userId = GetUserId();
+        var result = await _merchantService.GetMyProfileAsync(userId, cancellationToken);
         return Ok(result);
     }
 
-    [HttpGet("shipments")]
-    public async Task<IActionResult> GetShipments([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, CancellationToken cancellationToken = default)
+    [HttpPut("profile")]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateMerchantProfileRequest request, CancellationToken cancellationToken)
     {
-        var merchantProfileId = await GetMerchantProfileIdAsync(cancellationToken);
-        var pagination = new PaginationRequest { PageNumber = pageNumber, PageSize = pageSize };
-        var result = await _merchantService.GetMyShipmentRequestsAsync(merchantProfileId, pagination, cancellationToken);
+        var userId = GetUserId();
+        var result = await _merchantService.UpdateMyProfileAsync(userId, request, cancellationToken);
         return Ok(result);
     }
 
-    [HttpGet("shipments/{id}/offers")]
-    public async Task<IActionResult> GetShipmentOffers(Guid id, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, CancellationToken cancellationToken = default)
+    [HttpPost("shipment-requests")]
+    public async Task<IActionResult> CreateShipmentRequest([FromBody] CreateShipmentRequestRequest request, CancellationToken cancellationToken)
     {
-        var merchantProfileId = await GetMerchantProfileIdAsync(cancellationToken);
-        var pagination = new PaginationRequest { PageNumber = pageNumber, PageSize = pageSize };
-        var result = await _merchantService.GetShipmentOffersAsync(merchantProfileId, id, pagination, cancellationToken);
+        var userId = GetUserId();
+        var result = await _merchantService.CreateShipmentRequestAsync(userId, request, cancellationToken);
         return Ok(result);
     }
 
-    [HttpPost("offers/{offerId}/accept")]
-    public async Task<IActionResult> AcceptOffer(Guid offerId, CancellationToken cancellationToken)
+    [HttpGet("shipment-requests")]
+    public async Task<IActionResult> GetShipmentRequests(
+        [FromQuery] ShipmentRequestStatus? status,
+        [FromQuery] string? search,
+        [FromQuery] DateOnly? dateFrom,
+        [FromQuery] DateOnly? dateTo,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
     {
-        var merchantProfileId = await GetMerchantProfileIdAsync(cancellationToken);
-        var result = await _merchantService.AcceptOfferAsync(merchantProfileId, offerId, cancellationToken);
+        var userId = GetUserId();
+        var query = new GetMerchantShipmentRequestsQuery
+        {
+            Status = status,
+            Search = search,
+            DateFrom = dateFrom,
+            DateTo = dateTo,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+        var result = await _merchantService.GetMyShipmentRequestsAsync(userId, query, cancellationToken);
         return Ok(result);
     }
 
-    [HttpGet("shipments/{id}/tracking")]
-    public async Task<IActionResult> GetTracking(Guid id, CancellationToken cancellationToken)
+    [HttpGet("shipment-requests/{id:guid}")]
+    public async Task<IActionResult> GetShipmentRequestDetails(Guid id, CancellationToken cancellationToken)
     {
-        var merchantProfileId = await GetMerchantProfileIdAsync(cancellationToken);
-        var result = await _merchantService.GetShipmentTrackingAsync(merchantProfileId, id, cancellationToken);
+        var userId = GetUserId();
+        var result = await _merchantService.GetMyShipmentRequestDetailsAsync(userId, id, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("shipment-requests/{id:guid}/offers")]
+    public async Task<IActionResult> GetOffers(Guid id, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        var result = await _merchantService.GetOffersForMyRequestAsync(userId, id, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("shipment-requests/{id:guid}/offers/{offerId:guid}/accept")]
+    public async Task<IActionResult> AcceptOffer(Guid id, Guid offerId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        var result = await _merchantService.AcceptOfferAsync(userId, id, offerId, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("shipment-requests/{id:guid}/cancel")]
+    public async Task<IActionResult> CancelShipmentRequest(Guid id, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        await _merchantService.CancelShipmentRequestAsync(userId, id, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpGet("shipments/{shipmentId:guid}/tracking")]
+    public async Task<IActionResult> GetTracking(Guid shipmentId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        var result = await _merchantService.GetTrackingAsync(userId, shipmentId, cancellationToken);
         return Ok(result);
     }
 }

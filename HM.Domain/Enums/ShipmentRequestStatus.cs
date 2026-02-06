@@ -2,8 +2,11 @@ namespace HM.Domain.Enums;
 
 public enum ShipmentRequestStatus
 {
-    Open,
+    Draft,
+    Open,           // PendingOffers – available for offers
     OfferAccepted,
+    InProgress,
     Cancelled,
-    Expired
+    Expired,
+    Completed
 }

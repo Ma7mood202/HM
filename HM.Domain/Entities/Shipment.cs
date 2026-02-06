@@ -12,4 +12,7 @@ public class Shipment
     public ShipmentStatus Status { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
+    public double? CurrentLat { get; set; }
+    public double? CurrentLng { get; set; }
+    public DateTime? LocationUpdatedAt { get; set; }
 }

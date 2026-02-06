@@ -26,5 +26,11 @@ public class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
             .HasConversion<string>()
             .HasMaxLength(32)
             .IsRequired();
+
+        builder.Property(s => s.StartedAt);
+        builder.Property(s => s.CompletedAt);
+        builder.Property(s => s.CurrentLat);
+        builder.Property(s => s.CurrentLng);
+        builder.Property(s => s.LocationUpdatedAt);
     }
 }

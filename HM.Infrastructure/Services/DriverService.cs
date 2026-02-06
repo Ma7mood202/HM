@@ -3,6 +3,7 @@ using HM.Application.Common.DTOs.Driver;
 using HM.Application.Common.DTOs.Shipment;
 using HM.Application.Interfaces.Persistence;
 using HM.Application.Interfaces.Services;
+using HM.Domain.Entities;
 using HM.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -104,5 +105,146 @@ public sealed class DriverService : IDriverService
         dto.Notes = request.Notes;
         dto.TruckPlateNumber = truck?.PlateNumber;
         return dto;
+    }
+
+    public async Task<DriverShipmentDetailsResponse> GetMyShipmentDetailsAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default)
+    {
+        var (shipment, request) = await LoadShipmentOwnedByDriverAsync(driverUserId, shipmentId, cancellationToken);
+        return await BuildDriverShipmentDetailsAsync(shipment, request, cancellationToken);
+    }
+
+    public async Task<DriverShipmentDetailsResponse> StartTripAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default)
+    {
+        var (shipment, request) = await LoadShipmentOwnedByDriverAsync(driverUserId, shipmentId, cancellationToken);
+        if (shipment.Status != ShipmentStatus.AwaitingDriver && shipment.Status != ShipmentStatus.Ready)
+            throw new InvalidOperationException("Shipment can only be started when it is awaiting driver or ready.");
+
+        shipment.Status = ShipmentStatus.InTransit;
+        shipment.StartedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return await BuildDriverShipmentDetailsAsync(shipment, request, cancellationToken);
+    }
+
+    public async Task<DriverShipmentDetailsResponse> MarkArrivedAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default)
+    {
+        var (shipment, request) = await LoadShipmentOwnedByDriverAsync(driverUserId, shipmentId, cancellationToken);
+        if (shipment.Status != ShipmentStatus.InTransit)
+            throw new InvalidOperationException("Shipment must be in transit before marking as arrived.");
+
+        shipment.Status = ShipmentStatus.Arrived;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return await BuildDriverShipmentDetailsAsync(shipment, request, cancellationToken);
+    }
+
+    public async Task<DriverShipmentDetailsResponse> MarkReceivedAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default)
+    {
+        var (shipment, request) = await LoadShipmentOwnedByDriverAsync(driverUserId, shipmentId, cancellationToken);
+        if (shipment.Status != ShipmentStatus.Arrived)
+            throw new InvalidOperationException("Shipment must be arrived before marking as received.");
+
+        shipment.Status = ShipmentStatus.Completed;
+        shipment.CompletedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return await BuildDriverShipmentDetailsAsync(shipment, request, cancellationToken);
+    }
+
+    public async Task<DriverShipmentTrackingResponse> GetMyShipmentTrackingAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default)
+    {
+        var (shipment, _) = await LoadShipmentOwnedByDriverAsync(driverUserId, shipmentId, cancellationToken);
+        return new DriverShipmentTrackingResponse
+        {
+            ShipmentId = shipment.Id,
+            Status = shipment.Status,
+            CurrentLat = shipment.CurrentLat,
+            CurrentLng = shipment.CurrentLng,
+            LastUpdatedAt = shipment.LocationUpdatedAt ?? shipment.StartedAt ?? shipment.CompletedAt,
+            RoutePolyline = null
+        };
+    }
+
+    /// <summary>
+    /// Loads shipment and request; throws NotFound if shipment missing, Forbidden if not assigned to this driver.
+    /// </summary>
+    private async Task<(Shipment Shipment, ShipmentRequest Request)> LoadShipmentOwnedByDriverAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken)
+    {
+        var driverProfileId = await ResolveDriverProfileIdAsync(driverUserId, cancellationToken);
+
+        var shipment = await _db.Shipments.FindAsync([shipmentId], cancellationToken);
+        if (shipment == null)
+            throw new KeyNotFoundException("Shipment not found.");
+        if (shipment.DriverProfileId != driverProfileId)
+            throw new UnauthorizedAccessException("Shipment is not assigned to you.");
+
+        var request = await _db.ShipmentRequests.FindAsync([shipment.ShipmentRequestId], cancellationToken);
+        if (request == null)
+            throw new KeyNotFoundException("Shipment request not found.");
+
+        return (shipment, request);
+    }
+
+    private async Task<Guid> ResolveDriverProfileIdAsync(Guid driverUserId, CancellationToken cancellationToken)
+    {
+        var profile = await _db.DriverProfiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == driverUserId, cancellationToken);
+        if (profile == null)
+            throw new KeyNotFoundException("Driver profile not found.");
+        return profile.Id;
+    }
+
+    private async Task<DriverShipmentDetailsResponse> BuildDriverShipmentDetailsAsync(Shipment shipment, ShipmentRequest request, CancellationToken cancellationToken)
+    {
+        string? merchantName = null;
+        string? merchantPhone = null;
+        var merchantProfile = await _db.MerchantProfiles.FindAsync([request.MerchantProfileId], cancellationToken);
+        if (merchantProfile != null)
+        {
+            var merchantUser = await _db.Users.FindAsync([merchantProfile.UserId], cancellationToken);
+            merchantName = merchantUser?.FullName;
+            merchantPhone = merchantUser?.PhoneNumber;
+        }
+
+        decimal? offerPrice = null;
+        var offer = await _db.ShipmentOffers.FindAsync([shipment.AcceptedOfferId], cancellationToken);
+        if (offer != null)
+            offerPrice = offer.Price;
+
+        var from = request.DeliveryTimeFrom;
+        var to = request.DeliveryTimeTo;
+        var deliveryTimeWindow = (from.HasValue || to.HasValue)
+            ? $"{(from.HasValue ? from.Value.ToString("hh\\:mm") : "?")} - {(to.HasValue ? to.Value.ToString("hh\\:mm") : "?")}"
+            : "";
+
+        return new DriverShipmentDetailsResponse
+        {
+            ShipmentId = shipment.Id,
+            RequestNumber = request.RequestNumber,
+            Status = shipment.Status,
+            PickupAddressText = request.PickupLocation,
+            PickupLat = request.PickupLat,
+            PickupLng = request.PickupLng,
+            DropoffAddressText = request.DropoffLocation,
+            DropoffLat = request.DropoffLat,
+            DropoffLng = request.DropoffLng,
+            MerchantName = merchantName,
+            MerchantPhone = merchantPhone,
+            RecipientName = request.SenderName,
+            RecipientPhone = request.SenderPhone,
+            ParcelDescription = request.CargoDescription,
+            ParcelType = request.ParcelType,
+            WeightKg = request.EstimatedWeight,
+            ParcelCount = request.ParcelCount,
+            ParcelSize = request.ParcelSize,
+            DeliveryDate = request.DeliveryDate,
+            DeliveryTimeWindow = deliveryTimeWindow,
+            PaymentMethod = request.PaymentMethod,
+            OfferPrice = offerPrice,
+            CreatedAt = request.CreatedAt,
+            StartedAt = shipment.StartedAt,
+            CompletedAt = shipment.CompletedAt
+        };
     }
 }
