@@ -4,6 +4,7 @@ namespace HM.Application.Common.DTOs.Merchant;
 
 /// <summary>
 /// Response model for shipment offer data.
+/// PickupLocation/DropoffLocation set when used for truck "my offers" list.
 /// </summary>
 public class ShipmentOfferDto
 {
@@ -16,4 +17,6 @@ public class ShipmentOfferDto
     public ShipmentOfferStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime ExpirationAt { get; set; }
+    public string? PickupLocation { get; set; }
+    public string? DropoffLocation { get; set; }
 }

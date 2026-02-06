@@ -25,9 +25,11 @@ public class MappingProfile : Profile
         CreateMap<ShipmentRequest, ShipmentRequestDto>()
             .ForMember(d => d.OffersCount, o => o.Ignore());
 
-        // ShipmentOffer -> ShipmentOfferDto (TruckAccountName set in service)
+        // ShipmentOffer -> ShipmentOfferDto (TruckAccountName, PickupLocation, DropoffLocation set in service)
         CreateMap<ShipmentOffer, ShipmentOfferDto>()
-            .ForMember(d => d.TruckAccountName, o => o.Ignore());
+            .ForMember(d => d.TruckAccountName, o => o.Ignore())
+            .ForMember(d => d.PickupLocation, o => o.Ignore())
+            .ForMember(d => d.DropoffLocation, o => o.Ignore());
 
         // Shipment -> ShipmentStatusDto (UpdatedAt set in service)
         CreateMap<Shipment, ShipmentStatusDto>()
