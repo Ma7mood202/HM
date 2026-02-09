@@ -41,17 +41,11 @@ public class MerchantController : ControllerBase
     /// <summary>Update profile. Use form-data: FullName (required), Avatar (optional file).</summary>
     [HttpPut("profile")]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> UpdateProfile([FromForm] string FullName, [FromForm] IFormFile? Avatar, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateProfile([FromForm] UpdateMerchantProfileRequest request, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        string? avatarUrl = null;
-        if (Avatar != null)
-            avatarUrl = await _fileUpload.SaveImageAsync(Avatar, "merchant-avatars", cancellationToken);
-        var request = new UpdateMerchantProfileRequest
-        {
-            FullName = FullName?.Trim() ?? "",
-            AvatarUrl = avatarUrl
-        };
+        if (request.Avatar != null)
+            request.AvatarUrl = await _fileUpload.SaveImageAsync(request.Avatar, "merchant-avatars", cancellationToken);
         var result = await _merchantService.UpdateMyProfileAsync(userId, request, cancellationToken);
         return Ok(result);
     }

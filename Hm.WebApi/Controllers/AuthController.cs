@@ -36,17 +36,17 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     [AllowAnonymous]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> Register([FromForm] RegisterRequest request, [FromForm] IFormFile? NationalIdFrontImage, [FromForm] IFormFile? NationalIdBackImage, CancellationToken cancellationToken)
+    public async Task<IActionResult> Register([FromForm] RegisterRequest request, CancellationToken cancellationToken)
     {
         string? frontUrl = null, backUrl = null;
         if (request.UserType == UserType.Driver)
         {
-            if (NationalIdFrontImage == null || NationalIdFrontImage.Length == 0)
+            if (request.NationalIdFrontImage == null || request.NationalIdFrontImage.Length == 0)
                 return BadRequest("National ID front image is required for driver registration.");
-            if (NationalIdBackImage == null || NationalIdBackImage.Length == 0)
+            if (request.NationalIdBackImage == null || request.NationalIdBackImage.Length == 0)
                 return BadRequest("National ID back image is required for driver registration.");
-            frontUrl = await _fileUpload.SaveImageAsync(NationalIdFrontImage, "driver-national-id", cancellationToken);
-            backUrl = await _fileUpload.SaveImageAsync(NationalIdBackImage, "driver-national-id", cancellationToken);
+            frontUrl = await _fileUpload.SaveImageAsync(request.NationalIdFrontImage, "driver-national-id", cancellationToken);
+            backUrl = await _fileUpload.SaveImageAsync(request.NationalIdBackImage, "driver-national-id", cancellationToken);
         }
         var result = await _authService.RegisterAsync(request, frontUrl, backUrl, cancellationToken);
         return Ok(result);
@@ -96,14 +96,14 @@ public class AuthController : ControllerBase
     [HttpPost("driver/accept-invitation")]
     [AllowAnonymous]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> AcceptDriverInvitation([FromQuery] string token, [FromForm] RegisterRequest request, [FromForm] IFormFile? NationalIdFrontImage, [FromForm] IFormFile? NationalIdBackImage, CancellationToken cancellationToken)
+    public async Task<IActionResult> AcceptDriverInvitation([FromQuery] string token, [FromForm] RegisterRequest request, CancellationToken cancellationToken)
     {
-        if (NationalIdFrontImage == null || NationalIdFrontImage.Length == 0)
+        if (request.NationalIdFrontImage == null || request.NationalIdFrontImage.Length == 0)
             return BadRequest("National ID front image is required.");
-        if (NationalIdBackImage == null || NationalIdBackImage.Length == 0)
+        if (request.NationalIdBackImage == null || request.NationalIdBackImage.Length == 0)
             return BadRequest("National ID back image is required.");
-        var frontUrl = await _fileUpload.SaveImageAsync(NationalIdFrontImage, "driver-national-id", cancellationToken);
-        var backUrl = await _fileUpload.SaveImageAsync(NationalIdBackImage, "driver-national-id", cancellationToken);
+        var frontUrl = await _fileUpload.SaveImageAsync(request.NationalIdFrontImage, "driver-national-id", cancellationToken);
+        var backUrl = await _fileUpload.SaveImageAsync(request.NationalIdBackImage, "driver-national-id", cancellationToken);
         var result = await _authService.AcceptDriverInvitationAsync(token, request, frontUrl, backUrl, cancellationToken);
         return Ok(result);
     }

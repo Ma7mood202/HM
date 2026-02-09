@@ -45,47 +45,37 @@ public class DriverController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>Update profile (full name, phone, avatar, national ID front/back). Use form-data; send only fields to change. Files: Avatar, NationalIdFrontImage, NationalIdBackImage.</summary>
+    /// <summary>Update profile (full name, phone, avatar, national ID front/back). Use form-data; send only fields to change.</summary>
     [HttpPut("profile")]
     [Consumes("multipart/form-data")]
-    public async Task<ActionResult<DriverProfileDto>> UpdateProfile([FromForm] string? FullName, [FromForm] string? PhoneNumber, [FromForm] IFormFile? Avatar, [FromForm] IFormFile? NationalIdFrontImage, [FromForm] IFormFile? NationalIdBackImage, CancellationToken cancellationToken)
+    public async Task<ActionResult<DriverProfileDto>> UpdateProfile([FromForm] UpdateDriverProfileRequest request, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (userId == null) return Unauthorized();
 
-        string? avatarUrl = null, frontUrl = null, backUrl = null;
-        if (Avatar != null)
-            avatarUrl = await _fileUpload.SaveImageAsync(Avatar, "driver-avatars", cancellationToken);
-        if (NationalIdFrontImage != null)
-            frontUrl = await _fileUpload.SaveImageAsync(NationalIdFrontImage, "driver-national-id", cancellationToken);
-        if (NationalIdBackImage != null)
-            backUrl = await _fileUpload.SaveImageAsync(NationalIdBackImage, "driver-national-id", cancellationToken);
+        if (request.Avatar != null)
+            request.AvatarUrl = await _fileUpload.SaveImageAsync(request.Avatar, "driver-avatars", cancellationToken);
+        if (request.NationalIdFrontImage != null)
+            request.NationalIdFrontImageUrl = await _fileUpload.SaveImageAsync(request.NationalIdFrontImage, "driver-national-id", cancellationToken);
+        if (request.NationalIdBackImage != null)
+            request.NationalIdBackImageUrl = await _fileUpload.SaveImageAsync(request.NationalIdBackImage, "driver-national-id", cancellationToken);
 
-        var request = new UpdateDriverProfileRequest
-        {
-            FullName = string.IsNullOrWhiteSpace(FullName) ? null : FullName.Trim(),
-            PhoneNumber = string.IsNullOrWhiteSpace(PhoneNumber) ? null : PhoneNumber.Trim(),
-            AvatarUrl = avatarUrl,
-            NationalIdFrontImageUrl = frontUrl,
-            NationalIdBackImageUrl = backUrl
-        };
         var result = await _driverService.UpdateMyProfileAsync(userId.Value, request, cancellationToken);
         return Ok(result);
     }
 
-    /// <summary>Upload national ID (front and back required) as form-data files.</summary>
+    /// <summary>Upload national ID (front and back required) as form-data.</summary>
     [HttpPost("id")]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> UploadNationalId([FromForm] IFormFile? NationalIdFrontImage, [FromForm] IFormFile? NationalIdBackImage, CancellationToken cancellationToken)
+    public async Task<IActionResult> UploadNationalId([FromForm] UploadNationalIdRequest request, CancellationToken cancellationToken)
     {
-        if (NationalIdFrontImage == null || NationalIdFrontImage.Length == 0)
+        if (request.NationalIdFrontImage == null || request.NationalIdFrontImage.Length == 0)
             return BadRequest("National ID front image is required.");
-        if (NationalIdBackImage == null || NationalIdBackImage.Length == 0)
+        if (request.NationalIdBackImage == null || request.NationalIdBackImage.Length == 0)
             return BadRequest("National ID back image is required.");
         var driverProfileId = await GetDriverProfileIdAsync(cancellationToken);
-        var frontUrl = await _fileUpload.SaveImageAsync(NationalIdFrontImage, "driver-national-id", cancellationToken);
-        var backUrl = await _fileUpload.SaveImageAsync(NationalIdBackImage, "driver-national-id", cancellationToken);
-        var request = new UploadNationalIdRequest { NationalIdFrontImageUrl = frontUrl, NationalIdBackImageUrl = backUrl };
+        request.NationalIdFrontImageUrl = await _fileUpload.SaveImageAsync(request.NationalIdFrontImage, "driver-national-id", cancellationToken);
+        request.NationalIdBackImageUrl = await _fileUpload.SaveImageAsync(request.NationalIdBackImage, "driver-national-id", cancellationToken);
         var result = await _driverService.UploadNationalIdAsync(driverProfileId, request, cancellationToken);
         return Ok(result);
     }

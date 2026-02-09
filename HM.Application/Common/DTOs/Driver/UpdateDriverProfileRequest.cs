@@ -1,8 +1,9 @@
+using Microsoft.AspNetCore.Http;
+
 namespace HM.Application.Common.DTOs.Driver;
 
 /// <summary>
-/// Request to update driver profile (full name, phone, avatar URL, national ID front/back URLs). All fields optional.
-/// Controllers set URL fields after saving uploaded files.
+/// Request to update driver profile (form-data). All fields optional. Controller saves files and sets *Url fields before calling service.
 /// </summary>
 public class UpdateDriverProfileRequest
 {
@@ -11,4 +12,7 @@ public class UpdateDriverProfileRequest
     public string? AvatarUrl { get; set; }
     public string? NationalIdFrontImageUrl { get; set; }
     public string? NationalIdBackImageUrl { get; set; }
+    public IFormFile? Avatar { get; set; }
+    public IFormFile? NationalIdFrontImage { get; set; }
+    public IFormFile? NationalIdBackImage { get; set; }
 }
