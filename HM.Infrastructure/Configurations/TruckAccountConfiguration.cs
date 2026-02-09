@@ -15,10 +15,6 @@ public class TruckAccountConfiguration : IEntityTypeConfiguration<TruckAccount>
         builder.Property(t => t.UserId)
             .IsRequired();
 
-        builder.Property(t => t.DisplayName)
-            .IsRequired()
-            .HasMaxLength(256);
-
         builder.Property(t => t.IsAvailable)
             .IsRequired();
 

@@ -9,7 +9,17 @@ namespace HM.Application.Interfaces.Services;
 public interface IDriverService
 {
     /// <summary>
-    /// Uploads the driver's national ID for verification.
+    /// Gets the current driver's profile (including phone from user).
+    /// </summary>
+    Task<DriverProfileDto> GetMyProfileAsync(Guid driverUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates the driver's profile (full name, phone, avatar, national ID front/back). Only provided fields are updated.
+    /// </summary>
+    Task<DriverProfileDto> UpdateMyProfileAsync(Guid driverUserId, UpdateDriverProfileRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Uploads the driver's national ID (front and back) for verification.
     /// </summary>
     Task<DriverProfileDto> UploadNationalIdAsync(Guid driverProfileId, UploadNationalIdRequest request, CancellationToken cancellationToken = default);
 

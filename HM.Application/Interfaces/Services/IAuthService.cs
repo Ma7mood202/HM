@@ -14,8 +14,9 @@ public interface IAuthService
     Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken = default);
     /// <summary>
     /// Registers a new user and generates OTP (expires in 5 minutes). OTP verification required before login.
+    /// For driver: pass optional national ID image URLs (from file upload).
     /// </summary>
-    Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default);
+    Task<RegisterResponse> RegisterAsync(RegisterRequest request, string? nationalIdFrontImageUrl = null, string? nationalIdBackImageUrl = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Authenticates a user. Returns RequiresOtpVerification if OTP not yet verified; otherwise returns token.
@@ -44,6 +45,7 @@ public interface IAuthService
 
     /// <summary>
     /// Activates a driver account via invitation token.
+    /// Pass optional national ID image URLs (from file upload) for driver.
     /// </summary>
-    Task<AuthResponse> AcceptDriverInvitationAsync(string token, RegisterRequest request, CancellationToken cancellationToken = default);
+    Task<AuthResponse> AcceptDriverInvitationAsync(string token, RegisterRequest request, string? nationalIdFrontImageUrl = null, string? nationalIdBackImageUrl = null, CancellationToken cancellationToken = default);
 }

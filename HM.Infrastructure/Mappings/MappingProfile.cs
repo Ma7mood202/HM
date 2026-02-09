@@ -36,9 +36,10 @@ public class MappingProfile : Profile
             .ForMember(d => d.ShipmentId, o => o.MapFrom(s => s.Id))
             .ForMember(d => d.UpdatedAt, o => o.Ignore());
 
-        // DriverProfile -> DriverProfileDto (HasNationalId from NationalIdImageUrl)
+        // DriverProfile -> DriverProfileDto (HasNationalId, PhoneNumber set in service)
         CreateMap<DriverProfile, DriverProfileDto>()
-            .ForMember(d => d.HasNationalId, o => o.MapFrom(dp => !string.IsNullOrEmpty(dp.NationalIdImageUrl)));
+            .ForMember(d => d.HasNationalId, o => o.Ignore())
+            .ForMember(d => d.PhoneNumber, o => o.Ignore());
 
         // Shipment -> AssignedShipmentDto (driver view: no price; other fields set in service from request/truck)
         CreateMap<Shipment, AssignedShipmentDto>()

@@ -37,7 +37,7 @@ public sealed class AuthService : IAuthService
         _configuration = configuration;
     }
 
-    public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
+    public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, string? nationalIdFrontImageUrl = null, string? nationalIdBackImageUrl = null, CancellationToken cancellationToken = default)
     {
         var existingUser = await _userManager.FindByNameAsync(request.PhoneNumber);
         if (existingUser != null)
@@ -69,7 +69,7 @@ public sealed class AuthService : IAuthService
             IsActive = true,
             IsOtpVerified = false,
             OtpPurpose = OtpPurpose.Verification,
-            CreatedAt = DateTime.Now
+            CreatedAt = DateTime.UtcNow
         };
         SetOtp(domainUser, OtpPurpose.Verification);
         _db.Users.Add(domainUser);
@@ -80,9 +80,8 @@ public sealed class AuthService : IAuthService
             {
                 Id = Guid.NewGuid(),
                 UserId = domainUser.Id,
-                CompanyName = request.CompanyName,
                 IsVerified = false,
-                CreatedAt = DateTime.Now
+                CreatedAt = DateTime.UtcNow
             });
         }
         else if (request.UserType == UserType.TruckAccount)
@@ -91,9 +90,8 @@ public sealed class AuthService : IAuthService
             {
                 Id = Guid.NewGuid(),
                 UserId = domainUser.Id,
-                DisplayName = request.DisplayName ?? request.FullName,
                 IsAvailable = true,
-                CreatedAt = DateTime.Now
+                CreatedAt = DateTime.UtcNow
             });
         }
         else if (request.UserType == UserType.Driver)
@@ -103,8 +101,11 @@ public sealed class AuthService : IAuthService
                 Id = Guid.NewGuid(),
                 UserId = domainUser.Id,
                 FullName = request.FullName,
+                AvatarUrl = null,
+                NationalIdFrontImageUrl = string.IsNullOrWhiteSpace(nationalIdFrontImageUrl) ? null : nationalIdFrontImageUrl.Trim(),
+                NationalIdBackImageUrl = string.IsNullOrWhiteSpace(nationalIdBackImageUrl) ? null : nationalIdBackImageUrl.Trim(),
                 IsVerified = false,
-                CreatedAt = DateTime.Now
+                CreatedAt = DateTime.UtcNow
             });
         }
 
@@ -172,7 +173,7 @@ public sealed class AuthService : IAuthService
         if (user.OtpPurpose != OtpPurpose.Verification)
             throw new InvalidOperationException("No pending OTP verification for this account.");
 
-        if (string.IsNullOrEmpty(user.OtpCode) || user.OtpExpiresAt == null || user.OtpExpiresAt < DateTime.Now)
+        if (string.IsNullOrEmpty(user.OtpCode) || user.OtpExpiresAt == null || user.OtpExpiresAt < DateTime.UtcNow)
             throw new InvalidOperationException("OTP has expired. Please request a new one.");
 
         if (user.OtpCode != request.OtpCode)
@@ -271,7 +272,7 @@ public sealed class AuthService : IAuthService
         if (user.OtpPurpose != OtpPurpose.PasswordReset)
             throw new InvalidOperationException("No pending password reset OTP. Please request a new one.");
 
-        if (string.IsNullOrEmpty(user.OtpCode) || user.OtpExpiresAt == null || user.OtpExpiresAt < DateTime.Now)
+        if (string.IsNullOrEmpty(user.OtpCode) || user.OtpExpiresAt == null || user.OtpExpiresAt < DateTime.UtcNow)
             throw new InvalidOperationException("OTP has expired. Please request a new one.");
 
         if (user.OtpCode != request.OtpCode)
@@ -294,10 +295,10 @@ public sealed class AuthService : IAuthService
         };
     }
 
-    public async Task<AuthResponse> AcceptDriverInvitationAsync(string token, RegisterRequest request, CancellationToken cancellationToken = default)
+    public async Task<AuthResponse> AcceptDriverInvitationAsync(string token, RegisterRequest request, string? nationalIdFrontImageUrl = null, string? nationalIdBackImageUrl = null, CancellationToken cancellationToken = default)
     {
         var invitation = await _db.DriverInvitations
-            .FirstOrDefaultAsync(i => i.Token == token && !i.IsUsed && i.ExpiresAt > DateTime.Now, cancellationToken);
+            .FirstOrDefaultAsync(i => i.Token == token && !i.IsUsed && i.ExpiresAt > DateTime.UtcNow, cancellationToken);
         if (invitation == null)
             throw new InvalidOperationException("Invalid or expired invitation token.");
 
@@ -331,7 +332,7 @@ public sealed class AuthService : IAuthService
             IsActive = true,
             IsOtpVerified = false,
             OtpPurpose = OtpPurpose.Verification,
-            CreatedAt = DateTime.Now
+            CreatedAt = DateTime.UtcNow
         };
         SetOtp(domainUser, OtpPurpose.Verification);
         _db.Users.Add(domainUser);
@@ -341,8 +342,11 @@ public sealed class AuthService : IAuthService
             Id = Guid.NewGuid(),
             UserId = domainUser.Id,
             FullName = request.FullName,
+            AvatarUrl = null,
+            NationalIdFrontImageUrl = string.IsNullOrWhiteSpace(nationalIdFrontImageUrl) ? null : nationalIdFrontImageUrl.Trim(),
+            NationalIdBackImageUrl = string.IsNullOrWhiteSpace(nationalIdBackImageUrl) ? null : nationalIdBackImageUrl.Trim(),
             IsVerified = false,
-            CreatedAt = DateTime.Now
+            CreatedAt = DateTime.UtcNow
         };
         _db.DriverProfiles.Add(driverProfile);
 
@@ -369,7 +373,7 @@ public sealed class AuthService : IAuthService
     private void SetOtp(User user, OtpPurpose purpose)
     {
         user.OtpCode = GenerateOtp();
-        user.OtpExpiresAt = DateTime.Now.Add(OtpExpiry);
+        user.OtpExpiresAt = DateTime.UtcNow.Add(OtpExpiry);
         user.OtpPurpose = purpose;
     }
 

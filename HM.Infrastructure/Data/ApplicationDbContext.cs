@@ -28,6 +28,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<ShipmentOffer> ShipmentOffers => Set<ShipmentOffer>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
     public DbSet<DriverInvitation> DriverInvitations => Set<DriverInvitation>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<FcmDeviceToken> FcmDeviceTokens => Set<FcmDeviceToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

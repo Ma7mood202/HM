@@ -18,6 +18,8 @@ public interface IApplicationDbContext
     DbSet<ShipmentOffer> ShipmentOffers { get; }
     DbSet<Shipment> Shipments { get; }
     DbSet<DriverInvitation> DriverInvitations { get; }
+    DbSet<Notification> Notifications { get; }
+    DbSet<FcmDeviceToken> FcmDeviceTokens { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

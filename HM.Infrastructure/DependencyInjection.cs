@@ -3,6 +3,7 @@ using HM.Application.Interfaces.Services;
 using HM.Infrastructure.Data;
 using HM.Infrastructure.Identity;
 using HM.Infrastructure.Mappings;
+using HM.Infrastructure.Options;
 using HM.Infrastructure.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +38,9 @@ public static class DependencyInjection
         services.AddScoped<ITruckService, TruckService>();
         services.AddScoped<IDriverService, DriverService>();
         services.AddScoped<ICurrentProfileAccessor, CurrentProfileAccessor>();
+        services.AddScoped<INotificationService, NotificationService>();
+
+        services.Configure<FirebaseOptions>(configuration.GetSection(FirebaseOptions.SectionName));
 
         return services;
     }

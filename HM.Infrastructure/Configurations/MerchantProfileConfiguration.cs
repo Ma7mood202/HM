@@ -15,9 +15,6 @@ public class MerchantProfileConfiguration : IEntityTypeConfiguration<MerchantPro
         builder.Property(m => m.UserId)
             .IsRequired();
 
-        builder.Property(m => m.CompanyName)
-            .HasMaxLength(256);
-
         builder.Property(m => m.AvatarUrl)
             .HasMaxLength(512);
 

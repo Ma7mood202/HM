@@ -1,8 +1,11 @@
 using HM.Infrastructure;
 using HM.Infrastructure.Data;
+using HM.Infrastructure.Options;
 using Hm.WebApi.Extensions;
 using Hm.WebApi.Middlewares;
+using Hm.WebApi.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 namespace Hm.WebApi;
 
@@ -14,6 +17,13 @@ public class Program
         var configuration = builder.Configuration;
 
         builder.Services.AddInfrastructure(configuration);
+        // Resolve Firebase credentials path relative to app content root (e.g. Secrets/firebase-service-account.json)
+        builder.Services.Configure<FirebaseOptions>(options =>
+        {
+            if (!string.IsNullOrEmpty(options.CredentialsPath) && !Path.IsPathRooted(options.CredentialsPath))
+                options.CredentialsPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, options.CredentialsPath));
+        });
+        builder.Services.AddScoped<IFileUploadService, FileUploadService>();
         builder.Services.AddJwtAuthentication(configuration);
         builder.Services.AddJwtAuthorization();
         builder.Services.AddControllers();
@@ -66,6 +76,13 @@ public class Program
             app.UseSwaggerUI(options => options.SwaggerEndpoint("/swagger/v1/swagger.json", "HM API v1"));
         }
         app.UseHttpsRedirection();
+        var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
+        Directory.CreateDirectory(uploadsPath);
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(uploadsPath),
+            RequestPath = "/uploads"
+        });
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers();

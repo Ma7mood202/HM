@@ -1,12 +1,10 @@
 namespace HM.Application.Common.DTOs.Driver;
 
 /// <summary>
-/// Request model for uploading national ID.
+/// Result of saving national ID files (URLs). Used by controller after file upload.
 /// </summary>
 public class UploadNationalIdRequest
 {
-    /// <summary>
-    /// Base64 encoded image or URL of the national ID.
-    /// </summary>
-    public string NationalIdImage { get; set; } = string.Empty;
+    public string? NationalIdFrontImageUrl { get; set; }
+    public string? NationalIdBackImageUrl { get; set; }
 }

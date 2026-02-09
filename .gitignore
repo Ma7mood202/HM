@@ -34,6 +34,9 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# Uploaded files (stored under uploads/ at runtime)
+**/uploads/
+
 # ASP.NET
 *.dbmdl
 *.dbproj.schemaview
@@ -45,10 +48,19 @@ artifacts/
 appsettings.*.local.json
 secrets.json
 *.local.json
+**/Secrets/
+*-firebase-adminsdk-*.json
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Deploy
+deploy/
+
+# Reference / local
+SERVER-REFERENCE.md
+HM.postman_collection.json
 
 # Misc
 *.cache

@@ -2,6 +2,7 @@ using HM.Application.Common.DTOs.Merchant;
 using HM.Application.Interfaces.Services;
 using HM.Domain.Enums;
 using Hm.WebApi.Extensions;
+using Hm.WebApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,10 +14,12 @@ namespace Hm.WebApi.Controllers;
 public class MerchantController : ControllerBase
 {
     private readonly IMerchantService _merchantService;
+    private readonly IFileUploadService _fileUpload;
 
-    public MerchantController(IMerchantService merchantService)
+    public MerchantController(IMerchantService merchantService, IFileUploadService fileUpload)
     {
         _merchantService = merchantService;
+        _fileUpload = fileUpload;
     }
 
     private Guid GetUserId()
@@ -35,10 +38,20 @@ public class MerchantController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>Update profile. Use form-data: FullName (required), Avatar (optional file).</summary>
     [HttpPut("profile")]
-    public async Task<IActionResult> UpdateProfile([FromBody] UpdateMerchantProfileRequest request, CancellationToken cancellationToken)
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UpdateProfile([FromForm] string FullName, [FromForm] IFormFile? Avatar, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
+        string? avatarUrl = null;
+        if (Avatar != null)
+            avatarUrl = await _fileUpload.SaveImageAsync(Avatar, "merchant-avatars", cancellationToken);
+        var request = new UpdateMerchantProfileRequest
+        {
+            FullName = FullName?.Trim() ?? "",
+            AvatarUrl = avatarUrl
+        };
         var result = await _merchantService.UpdateMyProfileAsync(userId, request, cancellationToken);
         return Ok(result);
     }

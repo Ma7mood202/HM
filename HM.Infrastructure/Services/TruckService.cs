@@ -148,7 +148,11 @@ public sealed class TruckService : ITruckService
 
         var truckAccount = await _db.TruckAccounts.FindAsync([truckAccountId], cancellationToken);
         var dto = _mapper.Map<ShipmentOfferDto>(offer);
-        dto.TruckAccountName = truckAccount?.DisplayName ?? "";
+        if (truckAccount != null)
+        {
+            var user = await _db.Users.FindAsync([truckAccount.UserId], cancellationToken);
+            dto.TruckAccountName = user?.FullName ?? "";
+        }
         return dto;
     }
 
@@ -171,11 +175,13 @@ public sealed class TruckService : ITruckService
             .ToDictionaryAsync(r => r.Id, cancellationToken);
 
         var truckAccount = await _db.TruckAccounts.FindAsync([truckAccountId], cancellationToken);
+        var user = truckAccount != null ? await _db.Users.FindAsync([truckAccount.UserId], cancellationToken) : null;
+        var truckAccountName = user?.FullName ?? "";
 
         var items = offers.Select(o =>
         {
             var dto = _mapper.Map<ShipmentOfferDto>(o);
-            dto.TruckAccountName = truckAccount?.DisplayName ?? "";
+            dto.TruckAccountName = truckAccountName;
             var req = requests.GetValueOrDefault(o.ShipmentRequestId);
             dto.PickupLocation = req?.PickupLocation;
             dto.DropoffLocation = req?.DropoffLocation;

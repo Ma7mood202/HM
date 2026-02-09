@@ -16,11 +16,55 @@ public sealed class DriverService : IDriverService
 {
     private readonly IApplicationDbContext _db;
     private readonly IMapper _mapper;
+    private readonly INotificationService _notificationService;
 
-    public DriverService(IApplicationDbContext db, IMapper mapper)
+    public DriverService(IApplicationDbContext db, IMapper mapper, INotificationService notificationService)
     {
         _db = db;
         _mapper = mapper;
+        _notificationService = notificationService;
+    }
+
+    public async Task<DriverProfileDto> GetMyProfileAsync(Guid driverUserId, CancellationToken cancellationToken = default)
+    {
+        var profile = await _db.DriverProfiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == driverUserId, cancellationToken);
+        if (profile == null)
+            throw new KeyNotFoundException("Driver profile not found.");
+
+        var user = await _db.Users.FindAsync([driverUserId], cancellationToken);
+        var dto = _mapper.Map<DriverProfileDto>(profile);
+        dto.PhoneNumber = user?.PhoneNumber;
+        dto.HasNationalId = !string.IsNullOrEmpty(profile.NationalIdFrontImageUrl) && !string.IsNullOrEmpty(profile.NationalIdBackImageUrl);
+        return dto;
+    }
+
+    public async Task<DriverProfileDto> UpdateMyProfileAsync(Guid driverUserId, UpdateDriverProfileRequest request, CancellationToken cancellationToken = default)
+    {
+        var profile = await _db.DriverProfiles.FirstOrDefaultAsync(p => p.UserId == driverUserId, cancellationToken);
+        if (profile == null)
+            throw new KeyNotFoundException("Driver profile not found.");
+
+        if (!string.IsNullOrWhiteSpace(request.FullName))
+            profile.FullName = request.FullName.Trim();
+        if (request.AvatarUrl != null)
+            profile.AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim();
+        if (request.NationalIdFrontImageUrl != null)
+            profile.NationalIdFrontImageUrl = string.IsNullOrWhiteSpace(request.NationalIdFrontImageUrl) ? null : request.NationalIdFrontImageUrl.Trim();
+        if (request.NationalIdBackImageUrl != null)
+            profile.NationalIdBackImageUrl = string.IsNullOrWhiteSpace(request.NationalIdBackImageUrl) ? null : request.NationalIdBackImageUrl.Trim();
+
+        var user = await _db.Users.FindAsync([driverUserId], cancellationToken);
+        if (user != null && !string.IsNullOrWhiteSpace(request.PhoneNumber))
+            user.PhoneNumber = request.PhoneNumber.Trim();
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var dto = _mapper.Map<DriverProfileDto>(profile);
+        dto.PhoneNumber = user?.PhoneNumber;
+        dto.HasNationalId = !string.IsNullOrEmpty(profile.NationalIdFrontImageUrl) && !string.IsNullOrEmpty(profile.NationalIdBackImageUrl);
+        return dto;
     }
 
     public async Task<DriverProfileDto> UploadNationalIdAsync(Guid driverProfileId, UploadNationalIdRequest request, CancellationToken cancellationToken = default)
@@ -29,10 +73,15 @@ public sealed class DriverService : IDriverService
         if (profile == null)
             throw new InvalidOperationException("Driver profile not found.");
 
-        profile.NationalIdImageUrl = request.NationalIdImage;
+        if (!string.IsNullOrWhiteSpace(request.NationalIdFrontImageUrl))
+            profile.NationalIdFrontImageUrl = request.NationalIdFrontImageUrl.Trim();
+        if (!string.IsNullOrWhiteSpace(request.NationalIdBackImageUrl))
+            profile.NationalIdBackImageUrl = request.NationalIdBackImageUrl.Trim();
         await _db.SaveChangesAsync(cancellationToken);
 
-        return _mapper.Map<DriverProfileDto>(profile);
+        var dto = _mapper.Map<DriverProfileDto>(profile);
+        dto.HasNationalId = !string.IsNullOrEmpty(profile.NationalIdFrontImageUrl) && !string.IsNullOrEmpty(profile.NationalIdBackImageUrl);
+        return dto;
     }
 
     public async Task<ShipmentStatusDto> StartShipmentAsync(Guid driverProfileId, Guid shipmentId, CancellationToken cancellationToken = default)
@@ -44,11 +93,11 @@ public sealed class DriverService : IDriverService
             throw new InvalidOperationException("Shipment is not ready to start.");
 
         shipment.Status = ShipmentStatus.InTransit;
-        shipment.StartedAt = DateTime.Now;
+        shipment.StartedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
 
         var dto = _mapper.Map<ShipmentStatusDto>(shipment);
-        dto.UpdatedAt = DateTime.Now;
+        dto.UpdatedAt = DateTime.UtcNow;
         return dto;
     }
 
@@ -64,7 +113,7 @@ public sealed class DriverService : IDriverService
         await _db.SaveChangesAsync(cancellationToken);
 
         var dto = _mapper.Map<ShipmentStatusDto>(shipment);
-        dto.UpdatedAt = DateTime.Now;
+        dto.UpdatedAt = DateTime.UtcNow;
         return dto;
     }
 
@@ -77,11 +126,13 @@ public sealed class DriverService : IDriverService
             throw new InvalidOperationException("Shipment cannot be completed in current status.");
 
         shipment.Status = ShipmentStatus.Completed;
-        shipment.CompletedAt = DateTime.Now;
+        shipment.CompletedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
 
+        await NotifyMerchantShipmentDeliveredAsync(shipment.Id, cancellationToken);
+
         var dto = _mapper.Map<ShipmentStatusDto>(shipment);
-        dto.UpdatedAt = DateTime.Now;
+        dto.UpdatedAt = DateTime.UtcNow;
         return dto;
     }
 
@@ -147,6 +198,8 @@ public sealed class DriverService : IDriverService
         shipment.Status = ShipmentStatus.Completed;
         shipment.CompletedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
+
+        await NotifyMerchantShipmentDeliveredAsync(shipment.Id, cancellationToken);
 
         return await BuildDriverShipmentDetailsAsync(shipment, request, cancellationToken);
     }
@@ -246,5 +299,31 @@ public sealed class DriverService : IDriverService
             StartedAt = shipment.StartedAt,
             CompletedAt = shipment.CompletedAt
         };
+    }
+
+    private async Task NotifyMerchantShipmentDeliveredAsync(Guid shipmentId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var shipment = await _db.Shipments.FindAsync([shipmentId], cancellationToken);
+            if (shipment == null) return;
+            var request = await _db.ShipmentRequests.FindAsync([shipment.ShipmentRequestId], cancellationToken);
+            if (request == null) return;
+            var merchantProfile = await _db.MerchantProfiles.FindAsync([request.MerchantProfileId], cancellationToken);
+            if (merchantProfile == null) return;
+            var title = "تم التسليم";
+            var body = $"تم تسليم طلب رقم {request.RequestNumber} بنجاح!";
+            await _notificationService.SendNotificationAsync(
+                merchantProfile.UserId,
+                title,
+                body,
+                null,
+                true,
+                cancellationToken);
+        }
+        catch
+        {
+            // Don't fail the main flow
+        }
     }
 }

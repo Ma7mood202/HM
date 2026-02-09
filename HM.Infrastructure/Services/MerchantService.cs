@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AutoMapper;
 using HM.Application.Common.DTOs.Merchant;
 using HM.Application.Common.Models;
@@ -17,11 +18,13 @@ public sealed class MerchantService : IMerchantService
     private static readonly Random Rng = new();
     private readonly IApplicationDbContext _db;
     private readonly IMapper _mapper;
+    private readonly INotificationService _notificationService;
 
-    public MerchantService(IApplicationDbContext db, IMapper mapper)
+    public MerchantService(IApplicationDbContext db, IMapper mapper, INotificationService notificationService)
     {
         _db = db;
         _mapper = mapper;
+        _notificationService = notificationService;
     }
 
     public async Task<MerchantProfileResponse> GetMyProfileAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -61,7 +64,8 @@ public sealed class MerchantService : IMerchantService
             throw new InvalidOperationException("Full name is required.");
 
         user.FullName = request.FullName.Trim();
-        profile.AvatarUrl = request.AvatarUrl?.Trim();
+        if (request.AvatarUrl != null)
+            profile.AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim();
         await _db.SaveChangesAsync(cancellationToken);
 
         return new MerchantProfileResponse
@@ -124,6 +128,9 @@ public sealed class MerchantService : IMerchantService
         };
         _db.ShipmentRequests.Add(entity);
         await _db.SaveChangesAsync(cancellationToken);
+
+        await NotifyMerchantRequestSubmittedAsync(userId, cancellationToken);
+        await NotifyDriversNewRequestAsync(entity.Id, cancellationToken);
 
         return await BuildDetailsResponseAsync(profile.Id, entity.Id, cancellationToken);
     }
@@ -226,6 +233,11 @@ public sealed class MerchantService : IMerchantService
             .AsNoTracking()
             .Where(t => truckAccountIds.Contains(t.Id))
             .ToDictionaryAsync(t => t.Id, cancellationToken);
+        var userIds = truckAccounts.Values.Select(t => t.UserId).Distinct().ToList();
+        var users = await _db.Users
+            .AsNoTracking()
+            .Where(u => userIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, cancellationToken);
 
         var truckCounts = await _db.Trucks
             .Where(t => truckAccountIds.Contains(t.TruckAccountId))
@@ -237,6 +249,7 @@ public sealed class MerchantService : IMerchantService
         return offers.Select(o =>
         {
             var acc = truckAccounts.GetValueOrDefault(o.TruckAccountId);
+            var user = acc != null ? users.GetValueOrDefault(acc.UserId) : null;
             return new ShipmentOfferResponse
             {
                 OfferId = o.Id,
@@ -245,7 +258,7 @@ public sealed class MerchantService : IMerchantService
                 Currency = "SAR",
                 Notes = o.Notes,
                 CreatedAt = o.CreatedAt,
-                TruckAccountName = acc?.DisplayName ?? "",
+                TruckAccountName = user?.FullName ?? "",
                 TrucksCount = truckCountLookup.GetValueOrDefault(o.TruckAccountId, 0)
             };
         }).ToList();
@@ -293,6 +306,8 @@ public sealed class MerchantService : IMerchantService
 
         request.Status = ShipmentRequestStatus.OfferAccepted;
         await _db.SaveChangesAsync(cancellationToken);
+
+        await NotifyDriverOfferAcceptedAsync(offer.TruckAccountId, cancellationToken);
 
         return await BuildDetailsResponseAsync(profileId, request.Id, cancellationToken);
     }
@@ -435,12 +450,21 @@ public sealed class MerchantService : IMerchantService
         if (shipment != null)
         {
             var offer = await _db.ShipmentOffers.FindAsync([shipment.AcceptedOfferId], cancellationToken);
-            var truckAcc = offer != null ? await _db.TruckAccounts.FindAsync([offer.TruckAccountId], cancellationToken) : null;
+            string? truckAccountName = null;
+            if (offer != null)
+            {
+                var truckAcc = await _db.TruckAccounts.FindAsync([offer.TruckAccountId], cancellationToken);
+                if (truckAcc != null)
+                {
+                    var user = await _db.Users.FindAsync([truckAcc.UserId], cancellationToken);
+                    truckAccountName = user?.FullName;
+                }
+            }
             acceptedOffer = new AcceptedOfferSummary
             {
                 OfferId = shipment.AcceptedOfferId,
                 Price = offer?.Price ?? 0,
-                TruckAccountName = truckAcc?.DisplayName
+                TruckAccountName = truckAccountName
             };
 
             var truck = await _db.Trucks.FindAsync([shipment.TruckId], cancellationToken);
@@ -498,5 +522,82 @@ public sealed class MerchantService : IMerchantService
             AcceptedOffer = acceptedOffer,
             AssignedDriver = assignedDriver
         };
+    }
+
+    private async Task NotifyMerchantRequestSubmittedAsync(Guid merchantUserId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _notificationService.SendNotificationAsync(
+                merchantUserId,
+                "طلبك قيد التقييم",
+                "طلبك قيد التقييم سيصلك إشعار فور قبوله.",
+                null,
+                true,
+                cancellationToken);
+        }
+        catch
+        {
+            // Don't fail the main flow if notification fails
+        }
+    }
+
+    private async Task NotifyDriversNewRequestAsync(Guid shipmentRequestId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var truckAccountIds = await _db.Trucks
+                .Where(t => t.IsActive)
+                .Select(t => t.TruckAccountId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            var driverUserIds = await _db.TruckAccounts
+                .Where(ta => truckAccountIds.Contains(ta.Id))
+                .Select(ta => ta.UserId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            var data = JsonSerializer.Serialize(new { shipmentRequestId });
+            foreach (var driverUserId in driverUserIds)
+            {
+                try
+                {
+                    await _notificationService.SendNotificationAsync(
+                        driverUserId,
+                        "طلب جديد",
+                        "يوجد طلب مستعجل اضغط لكتابة عرض سعر.",
+                        data,
+                        true,
+                        cancellationToken);
+                }
+                catch
+                {
+                    // Continue with other drivers
+                }
+            }
+        }
+        catch
+        {
+            // Don't fail the main flow
+        }
+    }
+
+    private async Task NotifyDriverOfferAcceptedAsync(Guid truckAccountId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var truckAccount = await _db.TruckAccounts.FindAsync([truckAccountId], cancellationToken);
+            if (truckAccount == null) return;
+            await _notificationService.SendNotificationAsync(
+                truckAccount.UserId,
+                "تم قبول عرضك",
+                "تم قبول عرضك على الطلب.",
+                null,
+                true,
+                cancellationToken);
+        }
+        catch
+        {
+            // Don't fail the main flow
+        }
     }
 }

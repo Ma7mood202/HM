@@ -1,6 +1,8 @@
 using HM.Application.Common.DTOs.Auth;
 using HM.Application.Interfaces.Services;
+using HM.Domain.Enums;
 using Hm.WebApi.Extensions;
+using Hm.WebApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,10 +13,12 @@ namespace Hm.WebApi.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IFileUploadService _fileUpload;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IFileUploadService fileUpload)
     {
         _authService = authService;
+        _fileUpload = fileUpload;
     }
 
     [HttpPost("change-password")]
@@ -28,11 +32,23 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Register with form data. For driver, NationalIdFrontImage and NationalIdBackImage (files) are required.</summary>
     [HttpPost("register")]
     [AllowAnonymous]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> Register([FromForm] RegisterRequest request, [FromForm] IFormFile? NationalIdFrontImage, [FromForm] IFormFile? NationalIdBackImage, CancellationToken cancellationToken)
     {
-        var result = await _authService.RegisterAsync(request, cancellationToken);
+        string? frontUrl = null, backUrl = null;
+        if (request.UserType == UserType.Driver)
+        {
+            if (NationalIdFrontImage == null || NationalIdFrontImage.Length == 0)
+                return BadRequest("National ID front image is required for driver registration.");
+            if (NationalIdBackImage == null || NationalIdBackImage.Length == 0)
+                return BadRequest("National ID back image is required for driver registration.");
+            frontUrl = await _fileUpload.SaveImageAsync(NationalIdFrontImage, "driver-national-id", cancellationToken);
+            backUrl = await _fileUpload.SaveImageAsync(NationalIdBackImage, "driver-national-id", cancellationToken);
+        }
+        var result = await _authService.RegisterAsync(request, frontUrl, backUrl, cancellationToken);
         return Ok(result);
     }
 
@@ -76,11 +92,19 @@ public class AuthController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>Accept driver invitation. Use form data; NationalIdFrontImage and NationalIdBackImage (files) are required.</summary>
     [HttpPost("driver/accept-invitation")]
     [AllowAnonymous]
-    public async Task<IActionResult> AcceptDriverInvitation([FromQuery] string token, [FromBody] RegisterRequest request, CancellationToken cancellationToken)
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> AcceptDriverInvitation([FromQuery] string token, [FromForm] RegisterRequest request, [FromForm] IFormFile? NationalIdFrontImage, [FromForm] IFormFile? NationalIdBackImage, CancellationToken cancellationToken)
     {
-        var result = await _authService.AcceptDriverInvitationAsync(token, request, cancellationToken);
+        if (NationalIdFrontImage == null || NationalIdFrontImage.Length == 0)
+            return BadRequest("National ID front image is required.");
+        if (NationalIdBackImage == null || NationalIdBackImage.Length == 0)
+            return BadRequest("National ID back image is required.");
+        var frontUrl = await _fileUpload.SaveImageAsync(NationalIdFrontImage, "driver-national-id", cancellationToken);
+        var backUrl = await _fileUpload.SaveImageAsync(NationalIdBackImage, "driver-national-id", cancellationToken);
+        var result = await _authService.AcceptDriverInvitationAsync(token, request, frontUrl, backUrl, cancellationToken);
         return Ok(result);
     }
 }

@@ -16,7 +16,13 @@ public class DriverProfileConfiguration : IEntityTypeConfiguration<DriverProfile
             .IsRequired()
             .HasMaxLength(256);
 
-        builder.Property(d => d.NationalIdImageUrl)
+        builder.Property(d => d.AvatarUrl)
+            .HasMaxLength(1024);
+
+        builder.Property(d => d.NationalIdFrontImageUrl)
+            .HasMaxLength(1024);
+
+        builder.Property(d => d.NationalIdBackImageUrl)
             .HasMaxLength(1024);
 
         builder.Property(d => d.IsVerified)
