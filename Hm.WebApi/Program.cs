@@ -1,6 +1,8 @@
+using System.Text.Json.Serialization;
 using HM.Infrastructure;
 using HM.Infrastructure.Data;
 using HM.Infrastructure.Options;
+using Hm.WebApi.Converters;
 using Hm.WebApi.Extensions;
 using Hm.WebApi.Middlewares;
 using Hm.WebApi.Services;
@@ -26,7 +28,13 @@ public class Program
         builder.Services.AddScoped<IFileUploadService, FileUploadService>();
         builder.Services.AddJwtAuthentication(configuration);
         builder.Services.AddJwtAuthorization();
-        builder.Services.AddControllers();
+        builder.Services.AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(new DateOnlyJsonConverter());
+                options.JsonSerializerOptions.Converters.Add(new TimeOnlyJsonConverter());
+                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+            });
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(options =>
         {

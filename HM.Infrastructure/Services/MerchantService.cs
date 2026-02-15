@@ -181,7 +181,7 @@ public sealed class MerchantService : IMerchantService
             var from = r.DeliveryTimeFrom;
             var to = r.DeliveryTimeTo;
             var timeWindow = (from.HasValue || to.HasValue)
-                ? $"{(from.HasValue ? from.Value.ToString("hh\\:mm") : "?")} - {(to.HasValue ? to.Value.ToString("hh\\:mm") : "?")}"
+                ? $"{(from.HasValue ? from.Value.ToString("HH\\:mm") : "?")} - {(to.HasValue ? to.Value.ToString("HH\\:mm") : "?")}"
                 : "";
 
             return new ShipmentRequestSummaryResponse
@@ -439,7 +439,7 @@ public sealed class MerchantService : IMerchantService
         var from = request.DeliveryTimeFrom;
         var to = request.DeliveryTimeTo;
         var deliveryTimeWindow = (from.HasValue || to.HasValue)
-            ? $"{(from.HasValue ? from.Value.ToString("hh\\:mm") : "?")} - {(to.HasValue ? to.Value.ToString("hh\\:mm") : "?")}"
+            ? $"{(from.HasValue ? from.Value.ToString("HH\\:mm") : "?")} - {(to.HasValue ? to.Value.ToString("HH\\:mm") : "?")}"
             : "";
 
         AcceptedOfferSummary? acceptedOffer = null;
