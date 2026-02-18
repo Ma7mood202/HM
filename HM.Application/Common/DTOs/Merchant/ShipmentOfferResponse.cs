@@ -18,4 +18,6 @@ public class ShipmentOfferResponse
     public decimal? Rating { get; set; }
     public int? TrucksCount { get; set; }
     public string? DriverName { get; set; }
+    /// <summary>Pending = can be accepted; Accepted/Rejected/Expired = for display only.</summary>
+    public ShipmentOfferStatus Status { get; set; }
 }

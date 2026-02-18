@@ -259,7 +259,8 @@ public sealed class MerchantService : IMerchantService
                 Notes = o.Notes,
                 CreatedAt = o.CreatedAt,
                 TruckAccountName = user?.FullName ?? "",
-                TrucksCount = truckCountLookup.GetValueOrDefault(o.TruckAccountId, 0)
+                TrucksCount = truckCountLookup.GetValueOrDefault(o.TruckAccountId, 0),
+                Status = o.Status
             };
         }).ToList();
     }
