@@ -49,4 +49,14 @@ public interface ITruckService
     /// Generates QR payload (ShipmentId + tracking URL) for shipment tracking.
     /// </summary>
     Task<ShipmentQrPayloadDto> GetShipmentQrPayloadAsync(Guid truckAccountId, Guid shipmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Adds a truck to the truck account (active by default). Required before submitting offers.
+    /// </summary>
+    Task<TruckDto> CreateTruckAsync(Guid truckAccountId, CreateTruckRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists all trucks for the truck account.
+    /// </summary>
+    Task<IReadOnlyList<TruckDto>> GetMyTrucksAsync(Guid truckAccountId, CancellationToken cancellationToken = default);
 }

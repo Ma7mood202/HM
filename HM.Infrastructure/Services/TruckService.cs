@@ -119,6 +119,11 @@ public sealed class TruckService : ITruckService
 
     public async Task<ShipmentOfferDto> SubmitOfferAsync(Guid truckAccountId, SubmitOfferRequest request, CancellationToken cancellationToken = default)
     {
+        var hasActiveTruck = await _db.Trucks
+            .AnyAsync(t => t.TruckAccountId == truckAccountId && t.IsActive, cancellationToken);
+        if (!hasActiveTruck)
+            throw new InvalidOperationException("You must add at least one active truck before submitting offers.");
+
         var shipmentRequest = await _db.ShipmentRequests.FindAsync([request.ShipmentRequestId], cancellationToken);
         if (shipmentRequest == null)
             throw new KeyNotFoundException("Shipment request not found.");
@@ -408,5 +413,47 @@ public sealed class TruckService : ITruckService
             StartedAt = shipment.StartedAt,
             CompletedAt = shipment.CompletedAt
         };
+    }
+
+    public async Task<TruckDto> CreateTruckAsync(Guid truckAccountId, CreateTruckRequest request, CancellationToken cancellationToken = default)
+    {
+        var truck = new Truck
+        {
+            Id = Guid.NewGuid(),
+            TruckAccountId = truckAccountId,
+            TruckType = request.TruckType,
+            MaxWeight = request.MaxWeight,
+            PlateNumber = request.PlateNumber.Trim(),
+            IsActive = true
+        };
+        _db.Trucks.Add(truck);
+        await _db.SaveChangesAsync(cancellationToken);
+        return new TruckDto
+        {
+            Id = truck.Id,
+            TruckAccountId = truck.TruckAccountId,
+            TruckType = truck.TruckType,
+            MaxWeight = truck.MaxWeight,
+            PlateNumber = truck.PlateNumber,
+            IsActive = truck.IsActive
+        };
+    }
+
+    public async Task<IReadOnlyList<TruckDto>> GetMyTrucksAsync(Guid truckAccountId, CancellationToken cancellationToken = default)
+    {
+        var trucks = await _db.Trucks
+            .AsNoTracking()
+            .Where(t => t.TruckAccountId == truckAccountId)
+            .OrderBy(t => t.PlateNumber)
+            .ToListAsync(cancellationToken);
+        return trucks.Select(t => new TruckDto
+        {
+            Id = t.Id,
+            TruckAccountId = t.TruckAccountId,
+            TruckType = t.TruckType,
+            MaxWeight = t.MaxWeight,
+            PlateNumber = t.PlateNumber,
+            IsActive = t.IsActive
+        }).ToList();
     }
 }

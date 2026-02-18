@@ -50,6 +50,24 @@ public class TruckController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>Add a truck (required before submitting offers). New trucks are active by default.</summary>
+    [HttpPost("trucks")]
+    public async Task<IActionResult> CreateTruck([FromBody] CreateTruckRequest request, CancellationToken cancellationToken)
+    {
+        var truckAccountId = await GetTruckAccountIdAsync(cancellationToken);
+        var result = await _truckService.CreateTruckAsync(truckAccountId, request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>List all trucks for the current truck account.</summary>
+    [HttpGet("trucks")]
+    public async Task<IActionResult> GetMyTrucks(CancellationToken cancellationToken)
+    {
+        var truckAccountId = await GetTruckAccountIdAsync(cancellationToken);
+        var result = await _truckService.GetMyTrucksAsync(truckAccountId, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpPost("offers")]
     public async Task<IActionResult> SubmitOffer([FromBody] SubmitOfferRequest request, CancellationToken cancellationToken)
     {
