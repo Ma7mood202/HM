@@ -3,6 +3,7 @@ using HM.Application.Common.Models;
 using HM.Application.Interfaces.Services;
 using HM.Domain.Enums;
 using Hm.WebApi.Extensions;
+using Hm.WebApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,11 +16,13 @@ public class TruckController : ControllerBase
 {
     private readonly ITruckService _truckService;
     private readonly ICurrentProfileAccessor _profileAccessor;
+    private readonly IFileUploadService _fileUpload;
 
-    public TruckController(ITruckService truckService, ICurrentProfileAccessor profileAccessor)
+    public TruckController(ITruckService truckService, ICurrentProfileAccessor profileAccessor, IFileUploadService fileUpload)
     {
         _truckService = truckService;
         _profileAccessor = profileAccessor;
+        _fileUpload = fileUpload;
     }
 
     private async Task<Guid> GetTruckAccountIdAsync(CancellationToken cancellationToken)
@@ -31,6 +34,51 @@ public class TruckController : ControllerBase
         if (accountId == null)
             throw new UnauthorizedAccessException("Truck account not found.");
         return accountId.Value;
+    }
+
+    /// <summary>Get current truck account profile (full name, phone, avatar, national ID front/back).</summary>
+    [HttpGet("profile")]
+    public async Task<ActionResult<TruckProfileDto>> GetProfile(CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId == null) return Unauthorized();
+        var result = await _truckService.GetMyProfileAsync(userId.Value, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Update profile (full name, phone, avatar, national ID front/back). Use form-data; send only fields to change.</summary>
+    [HttpPut("profile")]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<TruckProfileDto>> UpdateProfile([FromForm] UpdateTruckProfileRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId == null) return Unauthorized();
+
+        if (request.Avatar != null)
+            request.AvatarUrl = await _fileUpload.SaveImageAsync(request.Avatar, "truck-avatars", cancellationToken);
+        if (request.NationalIdFrontImage != null)
+            request.NationalIdFrontImageUrl = await _fileUpload.SaveImageAsync(request.NationalIdFrontImage, "truck-national-id", cancellationToken);
+        if (request.NationalIdBackImage != null)
+            request.NationalIdBackImageUrl = await _fileUpload.SaveImageAsync(request.NationalIdBackImage, "truck-national-id", cancellationToken);
+
+        var result = await _truckService.UpdateMyProfileAsync(userId.Value, request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Upload national ID (front and back required) as form-data.</summary>
+    [HttpPost("id")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadNationalId([FromForm] UploadTruckNationalIdRequest request, CancellationToken cancellationToken)
+    {
+        if (request.NationalIdFrontImage == null || request.NationalIdFrontImage.Length == 0)
+            return BadRequest("National ID front image is required.");
+        if (request.NationalIdBackImage == null || request.NationalIdBackImage.Length == 0)
+            return BadRequest("National ID back image is required.");
+        var truckAccountId = await GetTruckAccountIdAsync(cancellationToken);
+        request.NationalIdFrontImageUrl = await _fileUpload.SaveImageAsync(request.NationalIdFrontImage, "truck-national-id", cancellationToken);
+        request.NationalIdBackImageUrl = await _fileUpload.SaveImageAsync(request.NationalIdBackImage, "truck-national-id", cancellationToken);
+        var result = await _truckService.UploadNationalIdAsync(truckAccountId, request, cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>Get all available (open) shipment requests; optional filter via query (TruckType, MinWeight, MaxWeight, FromRegion, ToRegion).</summary>

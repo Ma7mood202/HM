@@ -25,6 +25,70 @@ public sealed class TruckService : ITruckService
         _mapper = mapper;
     }
 
+    public async Task<TruckProfileDto> GetMyProfileAsync(Guid truckUserId, CancellationToken cancellationToken = default)
+    {
+        var account = await _db.TruckAccounts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.UserId == truckUserId, cancellationToken);
+        if (account == null)
+            throw new KeyNotFoundException("Truck account profile not found.");
+
+        var user = await _db.Users.FindAsync([truckUserId], cancellationToken);
+        var dto = _mapper.Map<TruckProfileDto>(account);
+        dto.PhoneNumber = user?.PhoneNumber;
+        dto.FullName = !string.IsNullOrWhiteSpace(account.FullName) ? account.FullName : (user?.FullName ?? string.Empty);
+        dto.HasNationalId = !string.IsNullOrEmpty(account.NationalIdFrontImageUrl) && !string.IsNullOrEmpty(account.NationalIdBackImageUrl);
+        return dto;
+    }
+
+    public async Task<TruckProfileDto> UpdateMyProfileAsync(Guid truckUserId, UpdateTruckProfileRequest request, CancellationToken cancellationToken = default)
+    {
+        var account = await _db.TruckAccounts.FirstOrDefaultAsync(t => t.UserId == truckUserId, cancellationToken);
+        if (account == null)
+            throw new KeyNotFoundException("Truck account profile not found.");
+
+        if (!string.IsNullOrWhiteSpace(request.FullName))
+            account.FullName = request.FullName.Trim();
+        if (request.AvatarUrl != null)
+            account.AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim();
+        if (request.NationalIdFrontImageUrl != null)
+            account.NationalIdFrontImageUrl = string.IsNullOrWhiteSpace(request.NationalIdFrontImageUrl) ? null : request.NationalIdFrontImageUrl.Trim();
+        if (request.NationalIdBackImageUrl != null)
+            account.NationalIdBackImageUrl = string.IsNullOrWhiteSpace(request.NationalIdBackImageUrl) ? null : request.NationalIdBackImageUrl.Trim();
+
+        var user = await _db.Users.FindAsync([truckUserId], cancellationToken);
+        if (user != null && !string.IsNullOrWhiteSpace(request.PhoneNumber))
+            user.PhoneNumber = request.PhoneNumber.Trim();
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var dto = _mapper.Map<TruckProfileDto>(account);
+        dto.PhoneNumber = user?.PhoneNumber;
+        dto.FullName = !string.IsNullOrWhiteSpace(account.FullName) ? account.FullName : (user?.FullName ?? string.Empty);
+        dto.HasNationalId = !string.IsNullOrEmpty(account.NationalIdFrontImageUrl) && !string.IsNullOrEmpty(account.NationalIdBackImageUrl);
+        return dto;
+    }
+
+    public async Task<TruckProfileDto> UploadNationalIdAsync(Guid truckAccountId, UploadTruckNationalIdRequest request, CancellationToken cancellationToken = default)
+    {
+        var account = await _db.TruckAccounts.FindAsync([truckAccountId], cancellationToken);
+        if (account == null)
+            throw new InvalidOperationException("Truck account not found.");
+
+        if (!string.IsNullOrWhiteSpace(request.NationalIdFrontImageUrl))
+            account.NationalIdFrontImageUrl = request.NationalIdFrontImageUrl.Trim();
+        if (!string.IsNullOrWhiteSpace(request.NationalIdBackImageUrl))
+            account.NationalIdBackImageUrl = request.NationalIdBackImageUrl.Trim();
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var user = await _db.Users.FindAsync([account.UserId], cancellationToken);
+        var dto = _mapper.Map<TruckProfileDto>(account);
+        dto.PhoneNumber = user?.PhoneNumber;
+        dto.FullName = !string.IsNullOrWhiteSpace(account.FullName) ? account.FullName : (user?.FullName ?? string.Empty);
+        dto.HasNationalId = !string.IsNullOrEmpty(account.NationalIdFrontImageUrl) && !string.IsNullOrEmpty(account.NationalIdBackImageUrl);
+        return dto;
+    }
+
     public async Task<PaginatedResult<ShipmentListItemDto>> GetOpenShipmentRequestsAsync(ShipmentRequestFilterDto? filter, PaginationRequest pagination, CancellationToken cancellationToken = default)
     {
         IQueryable<HM.Domain.Entities.ShipmentRequest> query = _db.ShipmentRequests

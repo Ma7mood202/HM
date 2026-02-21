@@ -11,6 +11,21 @@ namespace HM.Application.Interfaces.Services;
 public interface ITruckService
 {
     /// <summary>
+    /// Gets the current truck account's profile (including phone from user).
+    /// </summary>
+    Task<TruckProfileDto> GetMyProfileAsync(Guid truckUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates the truck account's profile (full name, phone, avatar, national ID front/back). Only provided fields are updated.
+    /// </summary>
+    Task<TruckProfileDto> UpdateMyProfileAsync(Guid truckUserId, UpdateTruckProfileRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Uploads the truck account's national ID (front and back) for verification.
+    /// </summary>
+    Task<TruckProfileDto> UploadNationalIdAsync(Guid truckAccountId, UploadTruckNationalIdRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets all open shipment requests available for offers (home screen).
     /// </summary>
     Task<PaginatedResult<ShipmentListItemDto>> GetOpenShipmentRequestsAsync(ShipmentRequestFilterDto? filter, PaginationRequest pagination, CancellationToken cancellationToken = default);

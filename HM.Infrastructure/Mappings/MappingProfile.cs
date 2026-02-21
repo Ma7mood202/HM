@@ -2,6 +2,7 @@ using AutoMapper;
 using HM.Application.Common.DTOs.Driver;
 using HM.Application.Common.DTOs.Merchant;
 using HM.Application.Common.DTOs.Shipment;
+using HM.Application.Common.DTOs.Truck;
 using HM.Domain.Entities;
 
 namespace HM.Infrastructure.Mappings;
@@ -40,6 +41,12 @@ public class MappingProfile : Profile
         CreateMap<DriverProfile, DriverProfileDto>()
             .ForMember(d => d.HasNationalId, o => o.Ignore())
             .ForMember(d => d.PhoneNumber, o => o.Ignore());
+
+        // TruckAccount -> TruckProfileDto (HasNationalId, PhoneNumber, FullName fallback set in service)
+        CreateMap<TruckAccount, TruckProfileDto>()
+            .ForMember(d => d.HasNationalId, o => o.Ignore())
+            .ForMember(d => d.PhoneNumber, o => o.Ignore())
+            .ForMember(d => d.FullName, o => o.Ignore());
 
         // Shipment -> AssignedShipmentDto (driver view: no price; other fields set in service from request/truck)
         CreateMap<Shipment, AssignedShipmentDto>()

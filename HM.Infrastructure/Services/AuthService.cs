@@ -90,6 +90,11 @@ public sealed class AuthService : IAuthService
             {
                 Id = Guid.NewGuid(),
                 UserId = domainUser.Id,
+                FullName = request.FullName,
+                AvatarUrl = null,
+                NationalIdFrontImageUrl = null,
+                NationalIdBackImageUrl = null,
+                IsVerified = false,
                 IsAvailable = true,
                 CreatedAt = DateTime.UtcNow
             });

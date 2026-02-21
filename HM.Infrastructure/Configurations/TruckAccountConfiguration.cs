@@ -20,5 +20,21 @@ public class TruckAccountConfiguration : IEntityTypeConfiguration<TruckAccount>
 
         builder.Property(t => t.CreatedAt)
             .IsRequired();
+
+        builder.Property(t => t.FullName)
+            .HasMaxLength(256)
+            .IsRequired();
+
+        builder.Property(t => t.AvatarUrl)
+            .HasMaxLength(1024);
+
+        builder.Property(t => t.NationalIdFrontImageUrl)
+            .HasMaxLength(1024);
+
+        builder.Property(t => t.NationalIdBackImageUrl)
+            .HasMaxLength(1024);
+
+        builder.Property(t => t.IsVerified)
+            .IsRequired();
     }
 }
