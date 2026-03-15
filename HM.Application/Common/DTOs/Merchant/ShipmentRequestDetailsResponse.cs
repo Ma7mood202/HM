@@ -15,20 +15,16 @@ public class ShipmentRequestDetailsResponse
 
     public string PickupAddressText { get; set; } = string.Empty;
     public string? PickupArea { get; set; }
-    public double? PickupLat { get; set; }
-    public double? PickupLng { get; set; }
 
     public string DropoffAddressText { get; set; } = string.Empty;
     public string? DropoffArea { get; set; }
-    public double? DropoffLat { get; set; }
-    public double? DropoffLng { get; set; }
 
     public string SenderName { get; set; } = string.Empty;
     public string SenderPhone { get; set; } = string.Empty;
 
     public string? ParcelDescription { get; set; }
     public string? ParcelType { get; set; }
-    public decimal ParcelWeightKg { get; set; }
+    public decimal ParcelWeightTon { get; set; }
     public string? ParcelSize { get; set; }
     public int ParcelCount { get; set; }
 
@@ -43,6 +39,14 @@ public class ShipmentRequestDetailsResponse
     public int OffersCount { get; set; }
     public AcceptedOfferSummary? AcceptedOffer { get; set; }
     public AssignedDriverSummary? AssignedDriver { get; set; }
+
+    /// <summary>Estimated delivery time (e.g. "2-3 hours"); populated on create.</summary>
+    public string? EstimatedTime { get; set; }
+    /// <summary>Distance in km; populated on create.</summary>
+    public decimal? DistanceKm { get; set; }
+    public string? PickupRegion { get; set; }
+    public string? DropoffRegion { get; set; }
+    public string? DriverImage { get; set; }
 }
 
 public class AcceptedOfferSummary

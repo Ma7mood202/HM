@@ -11,5 +11,5 @@ public class ShipmentOffer
     public string? Notes { get; set; }
     public ShipmentOfferStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
-    public DateTime ExpirationAt { get; set; }
+    public DateTime? ExpirationAt { get; set; }
 }

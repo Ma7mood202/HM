@@ -97,25 +97,28 @@ public sealed class MerchantService : IMerchantService
             MerchantProfileId = profile.Id,
             RequestNumber = await GenerateUniqueRequestNumberAsync(cancellationToken),
             RequiredTruckType = request.TruckType,
+            RequiredTruckBodyType = request.TruckBodyType,
 
+            PickupGovernorateId = request.PickupGovernorateId,
+            PickupRegionId = request.PickupRegionId,
             PickupLocation = request.PickupAddressText.Trim(),
             PickupArea = request.PickupArea?.Trim(),
-            PickupLat = request.PickupLat,
-            PickupLng = request.PickupLng,
 
+            DropoffGovernorateId = request.DropoffGovernorateId,
+            DropoffRegionId = request.DropoffRegionId,
             DropoffLocation = request.DropoffAddressText.Trim(),
             DropoffArea = request.DropoffArea?.Trim(),
-            DropoffLat = request.DropoffLat,
-            DropoffLng = request.DropoffLng,
 
             SenderName = request.SenderName.Trim(),
             SenderPhone = request.SenderPhone.Trim(),
+            ReceiverPhoneNumber = request.ReceiverPhoneNumber?.Trim(),
 
             CargoDescription = cargoDesc,
             ParcelType = request.ParcelType?.Trim(),
-            EstimatedWeight = request.ParcelWeightKg,
+            EstimatedWeightTon = request.ParcelWeightTon,
             ParcelSize = request.ParcelSize?.Trim(),
             ParcelCount = request.ParcelCount,
+            IsFragile = request.IsFragile,
 
             DeliveryDate = request.DeliveryDate,
             DeliveryTimeFrom = request.DeliveryTimeFrom,
@@ -176,6 +179,16 @@ public sealed class MerchantService : IMerchantService
             .ToListAsync(cancellationToken);
         var countLookup = offerCounts.ToDictionary(x => x.RequestId, x => x.Count);
 
+        var acceptedOffers = await _db.Shipments
+            .Where(s => requestIds.Contains(s.ShipmentRequestId))
+            .Join(_db.ShipmentOffers, s => s.AcceptedOfferId, o => o.Id, (s, o) => new { s.ShipmentRequestId, o.Price })
+            .ToDictionaryAsync(x => x.ShipmentRequestId, x => x.Price, cancellationToken);
+
+        var regionIds = items.SelectMany(r => new[] { r.PickupRegionId, r.DropoffRegionId }).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+        var governorateIds = items.SelectMany(r => new[] { r.PickupGovernorateId, r.DropoffGovernorateId }).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+        var regions = regionIds.Any() ? await _db.Regions.Where(reg => regionIds.Contains(reg.Id)).ToDictionaryAsync(reg => reg.Id, cancellationToken) : new Dictionary<Guid, Region>();
+        var governorates = governorateIds.Any() ? await _db.Governorates.Where(g => governorateIds.Contains(g.Id)).ToDictionaryAsync(g => g.Id, cancellationToken) : new Dictionary<Guid, Governorate>();
+
         var summaries = items.Select(r =>
         {
             var from = r.DeliveryTimeFrom;
@@ -191,11 +204,14 @@ public sealed class MerchantService : IMerchantService
                 Status = r.Status,
                 TruckType = r.RequiredTruckType,
                 CreatedAt = r.CreatedAt,
+                PickupGovernorate = r.PickupGovernorateId.HasValue && governorates.TryGetValue(r.PickupGovernorateId.Value, out var pg) ? pg.NameEn : null,
+                PickupRegion = r.PickupRegionId.HasValue && regions.TryGetValue(r.PickupRegionId.Value, out var pr) ? pr.NameEn : null,
                 PickupAreaOrText = r.PickupArea ?? r.PickupLocation,
                 DropoffAreaOrText = r.DropoffArea ?? r.DropoffLocation,
                 DeliveryDate = r.DeliveryDate,
                 DeliveryTimeWindow = timeWindow,
-                OffersCount = countLookup.GetValueOrDefault(r.Id, 0)
+                OffersCount = countLookup.GetValueOrDefault(r.Id, 0),
+                AmountDue = acceptedOffers.TryGetValue(r.Id, out var price) ? price : 0
             };
         }).ToList();
 
@@ -246,10 +262,18 @@ public sealed class MerchantService : IMerchantService
             .ToListAsync(cancellationToken);
         var truckCountLookup = truckCounts.ToDictionary(x => x.TruckAccountId, x => x.Count);
 
+        var firstTruckPerAccount = await _db.Trucks
+            .AsNoTracking()
+            .Where(t => truckAccountIds.Contains(t.TruckAccountId))
+            .GroupBy(t => t.TruckAccountId)
+            .Select(g => g.OrderBy(t => t.PlateNumber).First())
+            .ToDictionaryAsync(t => t.TruckAccountId, cancellationToken);
+
         return offers.Select(o =>
         {
             var acc = truckAccounts.GetValueOrDefault(o.TruckAccountId);
             var user = acc != null ? users.GetValueOrDefault(acc.UserId) : null;
+            var truck = firstTruckPerAccount.GetValueOrDefault(o.TruckAccountId);
             return new ShipmentOfferResponse
             {
                 OfferId = o.Id,
@@ -260,7 +284,11 @@ public sealed class MerchantService : IMerchantService
                 CreatedAt = o.CreatedAt,
                 TruckAccountName = user?.FullName ?? "",
                 TrucksCount = truckCountLookup.GetValueOrDefault(o.TruckAccountId, 0),
-                Status = o.Status
+                Status = o.Status,
+                TruckAccountImage = acc?.AvatarUrl,
+                TruckSize = truck != null ? truck.TruckType.ToString() : null,
+                TruckType = truck?.BodyType != null ? truck.BodyType.ToString() : null,
+                ParcelWeightTon = request.EstimatedWeightTon
             };
         }).ToList();
     }
@@ -308,9 +336,27 @@ public sealed class MerchantService : IMerchantService
         request.Status = ShipmentRequestStatus.OfferAccepted;
         await _db.SaveChangesAsync(cancellationToken);
 
-        await NotifyDriverOfferAcceptedAsync(offer.TruckAccountId, cancellationToken);
+        await NotifyDriverOfferAcceptedAsync(offer.TruckAccountId, request.Id, offer.Id, cancellationToken);
 
         return await BuildDetailsResponseAsync(profileId, request.Id, cancellationToken);
+    }
+
+    public async Task RejectOfferAsync(Guid userId, Guid shipmentRequestId, Guid offerId, CancellationToken cancellationToken = default)
+    {
+        var profileId = await ResolveMerchantProfileIdAsync(userId, cancellationToken);
+
+        var request = await _db.ShipmentRequests.FindAsync([shipmentRequestId], cancellationToken);
+        if (request == null || request.MerchantProfileId != profileId)
+            throw new KeyNotFoundException("Shipment request not found.");
+
+        var offer = await _db.ShipmentOffers.FirstOrDefaultAsync(o => o.Id == offerId, cancellationToken);
+        if (offer == null || offer.ShipmentRequestId != shipmentRequestId)
+            throw new KeyNotFoundException("Offer not found.");
+        if (offer.Status != ShipmentOfferStatus.Pending)
+            throw new InvalidOperationException("Offer is no longer pending.");
+
+        offer.Status = ShipmentOfferStatus.Rejected;
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task CancelShipmentRequestAsync(Guid userId, Guid shipmentRequestId, CancellationToken cancellationToken = default)
@@ -405,8 +451,8 @@ public sealed class MerchantService : IMerchantService
             throw new InvalidOperationException("Dropoff address is required.");
         if (request.ParcelCount < 1)
             throw new InvalidOperationException("Parcel count must be at least 1.");
-        if (request.ParcelWeightKg <= 0)
-            throw new InvalidOperationException("Parcel weight must be greater than 0.");
+        if (request.ParcelWeightTon <= 0)
+            throw new InvalidOperationException("Parcel weight (ton) must be greater than 0.");
         if (request.DeliveryDate < DateOnly.FromDateTime(DateTime.UtcNow))
             throw new InvalidOperationException("Delivery date cannot be in the past.");
         if (request.DeliveryTimeFrom.HasValue && request.DeliveryTimeTo.HasValue && request.DeliveryTimeFrom > request.DeliveryTimeTo)
@@ -437,6 +483,13 @@ public sealed class MerchantService : IMerchantService
 
         var offersCount = await _db.ShipmentOffers.CountAsync(o => o.ShipmentRequestId == shipmentRequestId, cancellationToken);
 
+        string? pickupRegionName = null;
+        string? dropoffRegionName = null;
+        if (request.PickupRegionId.HasValue)
+            pickupRegionName = await _db.Regions.Where(r => r.Id == request.PickupRegionId.Value).Select(r => r.NameEn).FirstOrDefaultAsync(cancellationToken);
+        if (request.DropoffRegionId.HasValue)
+            dropoffRegionName = await _db.Regions.Where(r => r.Id == request.DropoffRegionId.Value).Select(r => r.NameEn).FirstOrDefaultAsync(cancellationToken);
+
         var from = request.DeliveryTimeFrom;
         var to = request.DeliveryTimeTo;
         var deliveryTimeWindow = (from.HasValue || to.HasValue)
@@ -445,6 +498,7 @@ public sealed class MerchantService : IMerchantService
 
         AcceptedOfferSummary? acceptedOffer = null;
         AssignedDriverSummary? assignedDriver = null;
+        string? driverImage = null;
 
         var shipment = await _db.Shipments
             .FirstOrDefaultAsync(s => s.ShipmentRequestId == shipmentRequestId, cancellationToken);
@@ -472,6 +526,7 @@ public sealed class MerchantService : IMerchantService
             if (shipment.DriverProfileId.HasValue)
             {
                 var driver = await _db.DriverProfiles.FindAsync([shipment.DriverProfileId.Value], cancellationToken);
+                driverImage = driver?.AvatarUrl;
                 string? driverPhone = null;
                 if (driver?.UserId != null)
                 {
@@ -491,6 +546,8 @@ public sealed class MerchantService : IMerchantService
             }
         }
 
+        var (estimatedTime, distanceKm) = EstimateTimeAndDistance(request.PickupGovernorateId, request.DropoffGovernorateId, request.PickupRegionId, request.DropoffRegionId);
+
         return new ShipmentRequestDetailsResponse
         {
             Id = request.Id,
@@ -500,17 +557,13 @@ public sealed class MerchantService : IMerchantService
             CreatedAt = request.CreatedAt,
             PickupAddressText = request.PickupLocation,
             PickupArea = request.PickupArea,
-            PickupLat = request.PickupLat,
-            PickupLng = request.PickupLng,
             DropoffAddressText = request.DropoffLocation,
             DropoffArea = request.DropoffArea,
-            DropoffLat = request.DropoffLat,
-            DropoffLng = request.DropoffLng,
             SenderName = request.SenderName,
             SenderPhone = request.SenderPhone,
             ParcelDescription = request.CargoDescription,
             ParcelType = request.ParcelType,
-            ParcelWeightKg = request.EstimatedWeight,
+            ParcelWeightTon = request.EstimatedWeightTon,
             ParcelSize = request.ParcelSize,
             ParcelCount = request.ParcelCount,
             DeliveryDate = request.DeliveryDate,
@@ -521,8 +574,23 @@ public sealed class MerchantService : IMerchantService
             Notes = request.Notes,
             OffersCount = offersCount,
             AcceptedOffer = acceptedOffer,
-            AssignedDriver = assignedDriver
+            AssignedDriver = assignedDriver,
+            EstimatedTime = estimatedTime,
+            DistanceKm = distanceKm,
+            PickupRegion = pickupRegionName,
+            DropoffRegion = dropoffRegionName,
+            DriverImage = driverImage
         };
+    }
+
+    private static (string? estimatedTime, decimal? distanceKm) EstimateTimeAndDistance(Guid? pickupGovId, Guid? dropoffGovId, Guid? pickupRegionId, Guid? dropoffRegionId)
+    {
+        if (!pickupGovId.HasValue || !dropoffGovId.HasValue) return (null, null);
+        var sameGovernorate = pickupGovId == dropoffGovId;
+        var sameRegion = pickupRegionId.HasValue && dropoffRegionId.HasValue && pickupRegionId == dropoffRegionId;
+        if (sameRegion) return ("1-2 hours", 25m);
+        if (sameGovernorate) return ("2-4 hours", 80m);
+        return ("4-8 hours", 250m);
     }
 
     private async Task NotifyMerchantRequestSubmittedAsync(Guid merchantUserId, CancellationToken cancellationToken)
@@ -582,17 +650,18 @@ public sealed class MerchantService : IMerchantService
         }
     }
 
-    private async Task NotifyDriverOfferAcceptedAsync(Guid truckAccountId, CancellationToken cancellationToken)
+    private async Task NotifyDriverOfferAcceptedAsync(Guid truckAccountId, Guid shipmentRequestId, Guid offerId, CancellationToken cancellationToken)
     {
         try
         {
             var truckAccount = await _db.TruckAccounts.FindAsync([truckAccountId], cancellationToken);
             if (truckAccount == null) return;
+            var data = JsonSerializer.Serialize(new { shipmentRequestId, offerId });
             await _notificationService.SendNotificationAsync(
                 truckAccount.UserId,
                 "تم قبول عرضك",
                 "تم قبول عرضك على الطلب.",
-                null,
+                data,
                 true,
                 cancellationToken);
         }

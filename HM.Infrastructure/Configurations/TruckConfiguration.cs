@@ -20,6 +20,9 @@ public class TruckConfiguration : IEntityTypeConfiguration<Truck>
             .HasConversion<string>()
             .HasMaxLength(32)
             .IsRequired();
+        builder.Property(t => t.BodyType)
+            .HasConversion<string>()
+            .HasMaxLength(32);
 
         builder.Property(t => t.MaxWeight)
             .HasPrecision(18, 4)

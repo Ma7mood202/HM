@@ -8,6 +8,7 @@ namespace HM.Application.Common.DTOs.Truck;
 public class CreateTruckRequest
 {
     public TruckType TruckType { get; set; }
+    public TruckBodyType? BodyType { get; set; }
     public decimal MaxWeight { get; set; }
     public string PlateNumber { get; set; } = string.Empty;
 }

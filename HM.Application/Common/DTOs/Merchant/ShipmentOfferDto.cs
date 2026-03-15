@@ -16,7 +16,12 @@ public class ShipmentOfferDto
     public string? Notes { get; set; }
     public ShipmentOfferStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
-    public DateTime ExpirationAt { get; set; }
+    public DateTime? ExpirationAt { get; set; }
     public string? PickupLocation { get; set; }
     public string? DropoffLocation { get; set; }
+    public string? ReferenceNumber { get; set; }
+    public string? PickupRegion { get; set; }
+    public string? DropoffRegion { get; set; }
+    public string? ParcelType { get; set; }
+    public string? TruckAccountImage { get; set; }
 }

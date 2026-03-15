@@ -13,6 +13,8 @@ public class ShipmentRequestSummaryResponse
     public TruckType TruckType { get; set; }
     public DateTime CreatedAt { get; set; }
 
+    public string? PickupGovernorate { get; set; }
+    public string? PickupRegion { get; set; }
     public string PickupAreaOrText { get; set; } = string.Empty;
     public string DropoffAreaOrText { get; set; } = string.Empty;
 
@@ -20,4 +22,6 @@ public class ShipmentRequestSummaryResponse
     public string DeliveryTimeWindow { get; set; } = string.Empty;
 
     public int OffersCount { get; set; }
+    /// <summary>Amount due (accepted offer price or 0).</summary>
+    public decimal AmountDue { get; set; }
 }

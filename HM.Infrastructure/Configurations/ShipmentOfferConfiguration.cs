@@ -34,7 +34,6 @@ public class ShipmentOfferConfiguration : IEntityTypeConfiguration<ShipmentOffer
         builder.Property(s => s.CreatedAt)
             .IsRequired();
 
-        builder.Property(s => s.ExpirationAt)
-            .IsRequired();
+        builder.Property(s => s.ExpirationAt);
     }
 }

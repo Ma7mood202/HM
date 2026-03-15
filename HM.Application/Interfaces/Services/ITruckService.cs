@@ -51,6 +51,11 @@ public interface ITruckService
     Task<ShipmentDetailsDto> AssignSelfAsDriverAsync(Guid truckAccountId, Guid shipmentId, Guid truckId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Assigns a specific driver to the shipment (truck account must own the shipment).
+    /// </summary>
+    Task<ShipmentDetailsDto> AssignDriverAsync(Guid truckAccountId, Guid shipmentId, Guid driverProfileId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Generates an invitation link for an external driver (one invitation per shipment).
     /// </summary>
     Task<DriverInvitationDto> GenerateDriverInvitationAsync(Guid truckAccountId, Guid shipmentId, CancellationToken cancellationToken = default);

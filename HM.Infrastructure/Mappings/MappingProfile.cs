@@ -15,16 +15,18 @@ public class MappingProfile : Profile
 {
     public MappingProfile()
     {
-        // CreateShipmentRequestDto -> ShipmentRequest (partial; Id, MerchantProfileId, Status, CreatedAt set in service)
+        // CreateShipmentRequestDto -> ShipmentRequest (not used for create; service builds entity manually)
         CreateMap<CreateShipmentRequestDto, ShipmentRequest>()
             .ForMember(d => d.Id, o => o.Ignore())
             .ForMember(d => d.MerchantProfileId, o => o.Ignore())
             .ForMember(d => d.Status, o => o.Ignore())
-            .ForMember(d => d.CreatedAt, o => o.Ignore());
+            .ForMember(d => d.CreatedAt, o => o.Ignore())
+            .ForMember(d => d.EstimatedWeightTon, o => o.MapFrom(s => s.EstimatedWeight));
 
-        // ShipmentRequest -> ShipmentRequestDto (OffersCount set in service)
+        // ShipmentRequest -> ShipmentRequestDto (OffersCount set in service; weight in tons)
         CreateMap<ShipmentRequest, ShipmentRequestDto>()
-            .ForMember(d => d.OffersCount, o => o.Ignore());
+            .ForMember(d => d.OffersCount, o => o.Ignore())
+            .ForMember(d => d.EstimatedWeight, o => o.MapFrom(s => s.EstimatedWeightTon));
 
         // ShipmentOffer -> ShipmentOfferDto (TruckAccountName, PickupLocation, DropoffLocation set in service)
         CreateMap<ShipmentOffer, ShipmentOfferDto>()

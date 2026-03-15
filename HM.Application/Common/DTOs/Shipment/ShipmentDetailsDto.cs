@@ -13,9 +13,13 @@ public class ShipmentDetailsDto
     public Guid TruckId { get; set; }
     public Guid? DriverProfileId { get; set; }
 
+    public string? ReferenceNumber { get; set; }
+
     // Shipment Request Details
     public string PickupLocation { get; set; } = string.Empty;
     public string DropoffLocation { get; set; } = string.Empty;
+    public string? PickupRegion { get; set; }
+    public string? DropoffRegion { get; set; }
     public string CargoDescription { get; set; } = string.Empty;
     public TruckType RequiredTruckType { get; set; }
     public decimal EstimatedWeight { get; set; }
@@ -26,9 +30,11 @@ public class ShipmentDetailsDto
 
     // Truck Details
     public string TruckPlateNumber { get; set; } = string.Empty;
+    public TruckType? TruckType { get; set; }
 
     // Driver Details
     public string? DriverName { get; set; }
+    public string? DriverImage { get; set; }
 
     // Status
     public ShipmentStatus Status { get; set; }

@@ -152,7 +152,7 @@ public sealed class DriverService : IDriverService
         dto.PickupLocation = request.PickupLocation;
         dto.DropoffLocation = request.DropoffLocation;
         dto.CargoDescription = request.CargoDescription;
-        dto.EstimatedWeight = request.EstimatedWeight;
+        dto.EstimatedWeight = request.EstimatedWeightTon;
         dto.Notes = request.Notes;
         dto.TruckPlateNumber = truck?.PlateNumber;
         return dto;
@@ -277,18 +277,18 @@ public sealed class DriverService : IDriverService
             RequestNumber = request.RequestNumber,
             Status = shipment.Status,
             PickupAddressText = request.PickupLocation,
-            PickupLat = request.PickupLat,
-            PickupLng = request.PickupLng,
+            PickupLat = null,
+            PickupLng = null,
             DropoffAddressText = request.DropoffLocation,
-            DropoffLat = request.DropoffLat,
-            DropoffLng = request.DropoffLng,
+            DropoffLat = null,
+            DropoffLng = null,
             MerchantName = merchantName,
             MerchantPhone = merchantPhone,
             RecipientName = request.SenderName,
             RecipientPhone = request.SenderPhone,
             ParcelDescription = request.CargoDescription,
             ParcelType = request.ParcelType,
-            WeightKg = request.EstimatedWeight,
+            WeightKg = request.EstimatedWeightTon * 1000,
             ParcelCount = request.ParcelCount,
             ParcelSize = request.ParcelSize,
             DeliveryDate = request.DeliveryDate,

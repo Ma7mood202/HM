@@ -58,6 +58,15 @@ public class MerchantController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>Create shipment request (alternate route).</summary>
+    [HttpPost("shipment/shipment-requests")]
+    public async Task<IActionResult> CreateShipmentRequestV2([FromBody] CreateShipmentRequestRequest request, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        var result = await _merchantService.CreateShipmentRequestAsync(userId, request, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet("shipment-requests")]
     public async Task<IActionResult> GetShipmentRequests(
         [FromQuery] ShipmentRequestStatus? status,
@@ -104,6 +113,14 @@ public class MerchantController : ControllerBase
         var userId = GetUserId();
         var result = await _merchantService.AcceptOfferAsync(userId, id, offerId, cancellationToken);
         return Ok(result);
+    }
+
+    [HttpPost("shipment-requests/{id:guid}/offers/{offerId:guid}/reject")]
+    public async Task<IActionResult> RejectOffer(Guid id, Guid offerId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        await _merchantService.RejectOfferAsync(userId, id, offerId, cancellationToken);
+        return NoContent();
     }
 
     [HttpPost("shipment-requests/{id:guid}/cancel")]

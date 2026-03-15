@@ -14,6 +14,8 @@ public interface IApplicationDbContext
     DbSet<TruckAccount> TruckAccounts { get; }
     DbSet<Truck> Trucks { get; }
     DbSet<DriverProfile> DriverProfiles { get; }
+    DbSet<Governorate> Governorates { get; }
+    DbSet<Region> Regions { get; }
     DbSet<ShipmentRequest> ShipmentRequests { get; }
     DbSet<ShipmentOffer> ShipmentOffers { get; }
     DbSet<Shipment> Shipments { get; }

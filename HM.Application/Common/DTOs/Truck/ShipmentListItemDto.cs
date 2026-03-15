@@ -10,11 +10,16 @@ public class ShipmentListItemDto
 {
     public Guid ShipmentRequestId { get; set; }
     public Guid? ShipmentId { get; set; }
+    public string? ReferenceNumber { get; set; }
     public string PickupLocation { get; set; } = string.Empty;
     public string DropoffLocation { get; set; } = string.Empty;
+    public string? PickupRegion { get; set; }
+    public string? DropoffRegion { get; set; }
     public string CargoDescription { get; set; } = string.Empty;
     public TruckType? RequiredTruckType { get; set; }
     public decimal EstimatedWeight { get; set; }
+    public decimal EstimatedWeightTon { get; set; }
+    public string? ParcelType { get; set; }
     public int OffersCount { get; set; }
     public ShipmentStatus? Status { get; set; }
     public decimal Price { get; set; }

@@ -22,6 +22,8 @@ public interface IMerchantService
 
     Task<ShipmentRequestDetailsResponse> AcceptOfferAsync(Guid userId, Guid shipmentRequestId, Guid offerId, CancellationToken cancellationToken = default);
 
+    Task RejectOfferAsync(Guid userId, Guid shipmentRequestId, Guid offerId, CancellationToken cancellationToken = default);
+
     Task CancelShipmentRequestAsync(Guid userId, Guid shipmentRequestId, CancellationToken cancellationToken = default);
 
     Task<ShipmentTrackingResponse> GetTrackingAsync(Guid userId, Guid shipmentIdOrRequestId, CancellationToken cancellationToken = default);

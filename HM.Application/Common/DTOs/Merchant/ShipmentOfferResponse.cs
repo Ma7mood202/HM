@@ -20,4 +20,8 @@ public class ShipmentOfferResponse
     public string? DriverName { get; set; }
     /// <summary>Pending = can be accepted; Accepted/Rejected/Expired = for display only.</summary>
     public ShipmentOfferStatus Status { get; set; }
+    public string? TruckAccountImage { get; set; }
+    public string? TruckSize { get; set; }
+    public string? TruckType { get; set; }
+    public decimal ParcelWeightTon { get; set; }
 }

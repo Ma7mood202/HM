@@ -24,6 +24,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<TruckAccount> TruckAccounts => Set<TruckAccount>();
     public DbSet<Truck> Trucks => Set<Truck>();
     public DbSet<DriverProfile> DriverProfiles => Set<DriverProfile>();
+    public DbSet<Governorate> Governorates => Set<Governorate>();
+    public DbSet<Region> Regions => Set<Region>();
     public DbSet<ShipmentRequest> ShipmentRequests => Set<ShipmentRequest>();
     public DbSet<ShipmentOffer> ShipmentOffers => Set<ShipmentOffer>();
     public DbSet<Shipment> Shipments => Set<Shipment>();

@@ -142,6 +142,14 @@ public class TruckController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("shipments/{id:guid}/assign-driver")]
+    public async Task<IActionResult> AssignDriver(Guid id, [FromBody] AssignDriverRequest request, CancellationToken cancellationToken)
+    {
+        var truckAccountId = await GetTruckAccountIdAsync(cancellationToken);
+        var result = await _truckService.AssignDriverAsync(truckAccountId, id, request.DriverProfileId, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpPost("shipments/{id:guid}/invite-driver")]
     public async Task<IActionResult> InviteDriver(Guid id, CancellationToken cancellationToken)
     {

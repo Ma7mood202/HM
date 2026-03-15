@@ -99,10 +99,18 @@ public sealed class TruckService : ITruckService
             var truckType = filter.RequiredTruckType ?? filter.TruckType;
             if (truckType.HasValue)
                 query = query.Where(r => r.RequiredTruckType == truckType.Value);
+            if (filter.TruckBodyType.HasValue)
+                query = query.Where(r => r.RequiredTruckBodyType == filter.TruckBodyType.Value);
             if (filter.MinWeight.HasValue)
-                query = query.Where(r => r.EstimatedWeight >= filter.MinWeight.Value);
+                query = query.Where(r => r.EstimatedWeightTon >= filter.MinWeight.Value);
             if (filter.MaxWeight.HasValue)
-                query = query.Where(r => r.EstimatedWeight <= filter.MaxWeight.Value);
+                query = query.Where(r => r.EstimatedWeightTon <= filter.MaxWeight.Value);
+            if (filter.ParcelWeightTon.HasValue)
+                query = query.Where(r => r.EstimatedWeightTon <= filter.ParcelWeightTon.Value);
+            if (filter.PickupRegionId.HasValue)
+                query = query.Where(r => r.PickupRegionId == filter.PickupRegionId.Value);
+            if (filter.DropoffRegionId.HasValue)
+                query = query.Where(r => r.DropoffRegionId == filter.DropoffRegionId.Value);
             var fromRegion = filter.FromRegion ?? filter.PickupLocationSearch;
             var toRegion = filter.ToRegion ?? filter.DropoffLocationSearch;
             if (!string.IsNullOrWhiteSpace(fromRegion))
@@ -127,15 +135,23 @@ public sealed class TruckService : ITruckService
             .ToListAsync(cancellationToken);
         var countLookup = offerCounts.ToDictionary(x => x.RequestId, x => x.Count);
 
+        var regionIds = items.SelectMany(r => new[] { r.PickupRegionId, r.DropoffRegionId }).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+        var regions = regionIds.Any() ? await _db.Regions.Where(reg => regionIds.Contains(reg.Id)).ToDictionaryAsync(reg => reg.Id, cancellationToken) : new Dictionary<Guid, Region>();
+
         var dtos = items.Select(r => new ShipmentListItemDto
         {
             ShipmentRequestId = r.Id,
             ShipmentId = null,
+            ReferenceNumber = r.RequestNumber,
             PickupLocation = r.PickupLocation,
             DropoffLocation = r.DropoffLocation,
+            PickupRegion = r.PickupRegionId.HasValue && regions.TryGetValue(r.PickupRegionId.Value, out var pr) ? pr.NameEn : null,
+            DropoffRegion = r.DropoffRegionId.HasValue && regions.TryGetValue(r.DropoffRegionId.Value, out var dr) ? dr.NameEn : null,
             CargoDescription = r.CargoDescription,
             RequiredTruckType = r.RequiredTruckType,
-            EstimatedWeight = r.EstimatedWeight,
+            EstimatedWeight = r.EstimatedWeightTon,
+            EstimatedWeightTon = r.EstimatedWeightTon,
+            ParcelType = r.ParcelType,
             OffersCount = countLookup.GetValueOrDefault(r.Id, 0),
             Status = null,
             Price = 0,
@@ -159,6 +175,28 @@ public sealed class TruckService : ITruckService
         if (request == null)
             throw new KeyNotFoundException("Shipment request not found.");
 
+        string? pickupRegionName = null, dropoffRegionName = null;
+        if (request.PickupRegionId.HasValue)
+            pickupRegionName = await _db.Regions.Where(r => r.Id == request.PickupRegionId.Value).Select(r => r.NameEn).FirstOrDefaultAsync(cancellationToken);
+        if (request.DropoffRegionId.HasValue)
+            dropoffRegionName = await _db.Regions.Where(r => r.Id == request.DropoffRegionId.Value).Select(r => r.NameEn).FirstOrDefaultAsync(cancellationToken);
+
+        var shipment = await _db.Shipments.FirstOrDefaultAsync(s => s.ShipmentRequestId == shipmentRequestId, cancellationToken);
+        string? driverName = null, driverImage = null, truckPlateNumber = null;
+        TruckType? truckType = null;
+        if (shipment != null)
+        {
+            var truck = await _db.Trucks.FindAsync([shipment.TruckId], cancellationToken);
+            truckPlateNumber = truck?.PlateNumber;
+            truckType = truck?.TruckType;
+            if (shipment.DriverProfileId.HasValue)
+            {
+                var driver = await _db.DriverProfiles.FindAsync([shipment.DriverProfileId.Value], cancellationToken);
+                driverName = driver?.FullName;
+                driverImage = driver?.AvatarUrl;
+            }
+        }
+
         return new ShipmentDetailsDto
         {
             Id = default,
@@ -166,15 +204,20 @@ public sealed class TruckService : ITruckService
             AcceptedOfferId = default,
             TruckId = default,
             DriverProfileId = null,
+            ReferenceNumber = request.RequestNumber,
             PickupLocation = request.PickupLocation,
             DropoffLocation = request.DropoffLocation,
+            PickupRegion = pickupRegionName,
+            DropoffRegion = dropoffRegionName,
             CargoDescription = request.CargoDescription,
             RequiredTruckType = request.RequiredTruckType,
-            EstimatedWeight = request.EstimatedWeight,
+            EstimatedWeight = request.EstimatedWeightTon,
             Notes = request.Notes,
             Price = 0,
-            TruckPlateNumber = "",
-            DriverName = null,
+            TruckPlateNumber = truckPlateNumber ?? "",
+            DriverName = driverName,
+            DriverImage = driverImage,
+            TruckType = truckType,
             Status = default,
             StartedAt = null,
             CompletedAt = null
@@ -199,8 +242,6 @@ public sealed class TruckService : ITruckService
         if (alreadyOffered)
             throw new InvalidOperationException("You have already submitted an offer for this shipment request.");
 
-        var expirationAt = request.ExpirationAt ?? DateTime.UtcNow.AddDays(7);
-
         var offer = new ShipmentOffer
         {
             Id = Guid.NewGuid(),
@@ -210,7 +251,7 @@ public sealed class TruckService : ITruckService
             Notes = request.Notes,
             Status = ShipmentOfferStatus.Pending,
             CreatedAt = DateTime.UtcNow,
-            ExpirationAt = expirationAt
+            ExpirationAt = null
         };
         _db.ShipmentOffers.Add(offer);
         await _db.SaveChangesAsync(cancellationToken);
@@ -240,8 +281,13 @@ public sealed class TruckService : ITruckService
 
         var requestIds = offers.Select(o => o.ShipmentRequestId).Distinct().ToList();
         var requests = await _db.ShipmentRequests
+            .AsNoTracking()
             .Where(r => requestIds.Contains(r.Id))
-            .ToDictionaryAsync(r => r.Id, cancellationToken);
+            .ToListAsync(cancellationToken);
+        var requestLookup = requests.ToDictionary(r => r.Id);
+
+        var regionIds = requests.SelectMany(r => new[] { r.PickupRegionId, r.DropoffRegionId }).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+        var regions = regionIds.Any() ? await _db.Regions.Where(reg => regionIds.Contains(reg.Id)).ToDictionaryAsync(reg => reg.Id, cancellationToken) : new Dictionary<Guid, Region>();
 
         var truckAccount = await _db.TruckAccounts.FindAsync([truckAccountId], cancellationToken);
         var user = truckAccount != null ? await _db.Users.FindAsync([truckAccount.UserId], cancellationToken) : null;
@@ -251,9 +297,17 @@ public sealed class TruckService : ITruckService
         {
             var dto = _mapper.Map<ShipmentOfferDto>(o);
             dto.TruckAccountName = truckAccountName;
-            var req = requests.GetValueOrDefault(o.ShipmentRequestId);
-            dto.PickupLocation = req?.PickupLocation;
-            dto.DropoffLocation = req?.DropoffLocation;
+            dto.TruckAccountImage = truckAccount?.AvatarUrl;
+            var req = requestLookup.GetValueOrDefault(o.ShipmentRequestId);
+            if (req != null)
+            {
+                dto.PickupLocation = req.PickupLocation;
+                dto.DropoffLocation = req.DropoffLocation;
+                dto.ReferenceNumber = req.RequestNumber;
+                dto.ParcelType = req.ParcelType;
+                dto.PickupRegion = req.PickupRegionId.HasValue && regions.TryGetValue(req.PickupRegionId.Value, out var pr) ? pr.NameEn : null;
+                dto.DropoffRegion = req.DropoffRegionId.HasValue && regions.TryGetValue(req.DropoffRegionId.Value, out var dr) ? dr.NameEn : null;
+            }
             return dto;
         }).ToList();
 
@@ -310,6 +364,29 @@ public sealed class TruckService : ITruckService
         }
 
         shipment.DriverProfileId = driverProfile.Id;
+        shipment.Status = ShipmentStatus.Ready;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return await BuildShipmentDetailsDtoAsync(shipment.Id, cancellationToken);
+    }
+
+    public async Task<ShipmentDetailsDto> AssignDriverAsync(Guid truckAccountId, Guid shipmentId, Guid driverProfileId, CancellationToken cancellationToken = default)
+    {
+        var shipment = await _db.Shipments.FindAsync([shipmentId], cancellationToken);
+        if (shipment == null)
+            throw new KeyNotFoundException("Shipment not found.");
+
+        var offer = await _db.ShipmentOffers.FindAsync([shipment.AcceptedOfferId], cancellationToken);
+        if (offer == null || offer.TruckAccountId != truckAccountId)
+            throw new UnauthorizedAccessException("Shipment not found or not assigned to this truck account.");
+        if (shipment.Status != ShipmentStatus.AwaitingDriver)
+            throw new InvalidOperationException("Driver can only be assigned when shipment is awaiting driver.");
+
+        var driver = await _db.DriverProfiles.FindAsync([driverProfileId], cancellationToken);
+        if (driver == null)
+            throw new KeyNotFoundException("Driver not found.");
+
+        shipment.DriverProfileId = driverProfileId;
         shipment.Status = ShipmentStatus.Ready;
         await _db.SaveChangesAsync(cancellationToken);
 
@@ -407,7 +484,8 @@ public sealed class TruckService : ITruckService
                 DropoffLocation = req?.DropoffLocation ?? "",
                 CargoDescription = req?.CargoDescription ?? "",
                 RequiredTruckType = req?.RequiredTruckType,
-                EstimatedWeight = req?.EstimatedWeight ?? 0,
+                EstimatedWeight = req?.EstimatedWeightTon ?? 0,
+                EstimatedWeightTon = req?.EstimatedWeightTon ?? 0,
                 OffersCount = 1,
                 Status = s.Status,
                 Price = off?.Price ?? 0,
@@ -468,7 +546,7 @@ public sealed class TruckService : ITruckService
             DropoffLocation = request?.DropoffLocation ?? "",
             CargoDescription = request?.CargoDescription ?? "",
             RequiredTruckType = request?.RequiredTruckType ?? default,
-            EstimatedWeight = request?.EstimatedWeight ?? 0,
+            EstimatedWeight = request?.EstimatedWeightTon ?? 0,
             Notes = request?.Notes,
             Price = offer?.Price ?? 0,
             TruckPlateNumber = truck?.PlateNumber ?? "",
@@ -486,6 +564,7 @@ public sealed class TruckService : ITruckService
             Id = Guid.NewGuid(),
             TruckAccountId = truckAccountId,
             TruckType = request.TruckType,
+            BodyType = request.BodyType,
             MaxWeight = request.MaxWeight,
             PlateNumber = request.PlateNumber.Trim(),
             IsActive = true
