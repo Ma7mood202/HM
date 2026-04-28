@@ -167,4 +167,9 @@ if ! curl -fsS --max-time 30 --retry 3 --retry-delay 5 "$HEALTH_URL" -o /dev/nul
 fi
 log "health-check OK"
 
+# Shut down dotnet build servers (MSBuild + VBCSCompiler + Razor). They inherit
+# the flock lock fd and would block subsequent deploys. The MSBUILDDISABLENODEREUSE
+# env var prevents MSBuild reuse but does NOT cover VBCSCompiler.
+dotnet build-server shutdown 2>/dev/null | grep -E "successfully|down" || true
+
 log "deploy complete"
