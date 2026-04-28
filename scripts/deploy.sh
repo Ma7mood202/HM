@@ -24,6 +24,9 @@ readonly SOURCE_DIR="/opt/hm-source"
 readonly DEPLOY_DIR="/var/www/hm"
 readonly BACKUP_DIR="/var/www/hm.prev"
 readonly STAGING_DIR="$(mktemp -d -t hm-publish-XXXXXX)"
+# mktemp creates with mode 700, but rsync -a propagates that to $DEPLOY_DIR,
+# breaking chdir for the service user (www-data). Force traversable mode.
+chmod 755 "$STAGING_DIR"
 readonly SERVICE_NAME="hm"
 readonly HEALTH_URL="https://hm.fustani.cloud/swagger/index.html"
 export PATH="$PATH:/root/.dotnet/tools"
@@ -126,6 +129,8 @@ rsync -a --delete \
   --exclude='uploads' \
   --exclude='Secrets' \
   "$STAGING_DIR/" "$DEPLOY_DIR/"
+# Ensure the deploy dir itself is traversable by the systemd service user (www-data).
+chmod 755 "$DEPLOY_DIR"
 log "swap complete"
 
 # 9. Start service.
