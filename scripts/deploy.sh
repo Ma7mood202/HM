@@ -4,6 +4,22 @@
 set -euo pipefail
 
 readonly LOCK_FILE="/var/run/hm-deploy.lock"
+
+# 1. Acquire exclusive lock by re-exec'ing under flock(1).
+# flock(1) opens the lock file with close-on-exec, so dotnet's MSBuild "node reuse"
+# build-server children don't inherit the fd and survive past the script. The
+# in-shell "exec 9>; flock 9" pattern leaks the fd to dotnet children (which
+# linger 12+ hours), permanently holding the lock.
+if [[ "${HM_DEPLOY_FLOCKED:-}" != "1" ]]; then
+  export HM_DEPLOY_FLOCKED=1
+  exec flock -n "$LOCK_FILE" "$0" "$@"
+  # If exec returns, flock could not be exec'd; if flock could not acquire the lock,
+  # it exits 1 and we never reach this line. Either way, propagate.
+  echo "[deploy:FAIL] could not acquire deploy lock at $LOCK_FILE" >&2
+  exit 1
+fi
+
+# Below this line we are running with the lock held.
 readonly SOURCE_DIR="/opt/hm-source"
 readonly DEPLOY_DIR="/var/www/hm"
 readonly BACKUP_DIR="/var/www/hm.prev"
@@ -34,10 +50,6 @@ rollback() {
 }
 
 trap cleanup EXIT
-
-# 1. Acquire exclusive lock (non-blocking: fail fast if another deploy is running).
-exec 9>"$LOCK_FILE"
-flock -n 9 || fail "another deploy is already in progress"
 
 log "lock acquired; staging dir: $STAGING_DIR"
 
