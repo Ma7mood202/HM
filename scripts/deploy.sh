@@ -18,6 +18,19 @@ fail() { printf '\033[0;31m[deploy:FAIL]\033[0m %s\n' "$*" >&2; exit 1; }
 cleanup() {
   rm -rf "$STAGING_DIR"
 }
+
+rollback() {
+  log "ROLLBACK: restoring previous binaries"
+  systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+  if [[ -d "$BACKUP_DIR" ]]; then
+    rm -rf "$DEPLOY_DIR"
+    mv "$BACKUP_DIR" "$DEPLOY_DIR"
+  fi
+  systemctl start "$SERVICE_NAME" || true
+  log "ROLLBACK: last 50 lines of journalctl -u $SERVICE_NAME:"
+  journalctl -u "$SERVICE_NAME" -n 50 --no-pager || true
+}
+
 trap cleanup EXIT
 
 # Acquire exclusive lock (non-blocking: fail fast if another deploy is running).
@@ -83,6 +96,30 @@ rsync -a --delete \
   "$STAGING_DIR/" "$DEPLOY_DIR/"
 log "swap complete"
 
-# --- Steps will be appended in subsequent tasks ---
+# 8. Start service.
+log "starting $SERVICE_NAME"
+systemctl start "$SERVICE_NAME"
+
+# 9. Verify systemd reports active within 30s.
+log "waiting for service to become active"
+for i in {1..30}; do
+  if systemctl is-active --quiet "$SERVICE_NAME"; then
+    log "service active after ${i}s"
+    break
+  fi
+  if [[ $i -eq 30 ]]; then
+    rollback
+    fail "service did not become active within 30s"
+  fi
+  sleep 1
+done
+
+# 10. Verify Swagger responds 200.
+log "verifying $HEALTH_URL"
+if ! curl -fsS --max-time 10 "$HEALTH_URL" -o /dev/null; then
+  rollback
+  fail "Swagger health-check failed at $HEALTH_URL"
+fi
+log "health-check OK"
 
 log "deploy complete"
