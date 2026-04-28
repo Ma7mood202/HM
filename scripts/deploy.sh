@@ -10,7 +10,7 @@ readonly BACKUP_DIR="/var/www/hm.prev"
 readonly STAGING_DIR="$(mktemp -d -t hm-publish-XXXXXX)"
 readonly SERVICE_NAME="hm"
 readonly HEALTH_URL="https://hm.fustani.cloud/swagger/index.html"
-readonly PATH="$PATH:/root/.dotnet/tools"
+export PATH="$PATH:/root/.dotnet/tools"
 
 log()  { printf '\033[0;36m[deploy]\033[0m %s\n' "$*"; }
 fail() { printf '\033[0;31m[deploy:FAIL]\033[0m %s\n' "$*" >&2; exit 1; }
