@@ -26,6 +26,14 @@ flock -n 9 || fail "another deploy is already in progress"
 
 log "lock acquired; staging dir: $STAGING_DIR"
 
+# 1. Sync source from origin/main.
+log "syncing source from origin/main"
+cd "$SOURCE_DIR"
+git fetch origin
+git checkout main
+git reset --hard origin/main
+log "source at commit: $(git rev-parse --short HEAD)"
+
 # --- Steps will be appended in subsequent tasks ---
 
 log "deploy complete"
