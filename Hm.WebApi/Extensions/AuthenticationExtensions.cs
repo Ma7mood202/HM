@@ -8,6 +8,7 @@ namespace Hm.WebApi.Extensions;
 
 /// <summary>
 /// Configures JWT Bearer authentication. Clock skew = zero.
+/// Supports SignalR WebSocket auth via query string access_token.
 /// </summary>
 public static class AuthenticationExtensions
 {
@@ -33,6 +34,22 @@ public static class AuthenticationExtensions
                 ValidAudience = audience,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
                 ClockSkew = TimeSpan.Zero
+            };
+
+            // Allow SignalR WebSocket connections to pass JWT via query string.
+            // WebSocket requests cannot set HTTP headers, so the token is sent as ?access_token=...
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    var accessToken = context.Request.Query["access_token"];
+                    var path = context.HttpContext.Request.Path;
+                    if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                    {
+                        context.Token = accessToken;
+                    }
+                    return Task.CompletedTask;
+                }
             };
         });
 

@@ -67,4 +67,19 @@ public interface IDriverService
     /// Gets minimal tracking data for the shipment (location if stored).
     /// </summary>
     Task<DriverShipmentTrackingResponse> GetMyShipmentTrackingAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates the driver's current GPS location for an active (InTransit) shipment.
+    /// </summary>
+    Task<LocationUpdateResponse> UpdateLocationAsync(Guid driverUserId, Guid shipmentId, UpdateLocationRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Pause trip ("استراحة"). Allowed when InTransit → Paused.
+    /// </summary>
+    Task<DriverShipmentDetailsResponse> PauseTripAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Resume trip ("استئناف"). Allowed when Paused → InTransit.
+    /// </summary>
+    Task<DriverShipmentDetailsResponse> ResumeTripAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default);
 }

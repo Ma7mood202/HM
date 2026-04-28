@@ -28,6 +28,17 @@ public class Program
         builder.Services.AddScoped<IFileUploadService, FileUploadService>();
         builder.Services.AddJwtAuthentication(configuration);
         builder.Services.AddJwtAuthorization();
+        builder.Services.AddSignalR();
+        builder.Services.AddCors(options =>
+        {
+            options.AddDefaultPolicy(policy =>
+            {
+                policy.SetIsOriginAllowed(_ => true)
+                      .AllowAnyHeader()
+                      .AllowAnyMethod()
+                      .AllowCredentials(); // Required for SignalR WebSocket transport
+            });
+        });
         builder.Services.AddControllers()
             .AddJsonOptions(options =>
             {
@@ -86,14 +97,17 @@ public class Program
         app.UseHttpsRedirection();
         var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
         Directory.CreateDirectory(uploadsPath);
+        app.UseStaticFiles(); // Serves wwwroot (test pages)
         app.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = new PhysicalFileProvider(uploadsPath),
             RequestPath = "/uploads"
         });
+        app.UseCors();
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers();
+        app.MapHub<Hm.WebApi.Hubs.ShipmentTrackingHub>("/hubs/shipment-tracking");
 
         await app.RunAsync();
     }

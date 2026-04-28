@@ -174,6 +174,8 @@ public sealed class DriverService : IDriverService
         shipment.StartedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
 
+        await NotifyMerchantStatusChangeAsync(shipment.Id, "بدأ الرحلة", $"بدأ السائق رحلة توصيل طلب رقم {request.RequestNumber}", cancellationToken);
+
         return await BuildDriverShipmentDetailsAsync(shipment, request, cancellationToken);
     }
 
@@ -185,6 +187,8 @@ public sealed class DriverService : IDriverService
 
         shipment.Status = ShipmentStatus.Arrived;
         await _db.SaveChangesAsync(cancellationToken);
+
+        await NotifyMerchantStatusChangeAsync(shipment.Id, "تم الوصول", $"وصل السائق لتسليم طلب رقم {request.RequestNumber}", cancellationToken);
 
         return await BuildDriverShipmentDetailsAsync(shipment, request, cancellationToken);
     }
@@ -216,6 +220,59 @@ public sealed class DriverService : IDriverService
             LastUpdatedAt = shipment.LocationUpdatedAt ?? shipment.StartedAt ?? shipment.CompletedAt,
             RoutePolyline = null
         };
+    }
+
+    public async Task<LocationUpdateResponse> UpdateLocationAsync(Guid driverUserId, Guid shipmentId, UpdateLocationRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.Latitude < -90 || request.Latitude > 90)
+            throw new ArgumentException("Latitude must be between -90 and 90.");
+        if (request.Longitude < -180 || request.Longitude > 180)
+            throw new ArgumentException("Longitude must be between -180 and 180.");
+
+        var (shipment, _) = await LoadShipmentOwnedByDriverAsync(driverUserId, shipmentId, cancellationToken);
+        if (shipment.Status != ShipmentStatus.InTransit)
+            throw new InvalidOperationException("Location updates are only accepted when shipment is in transit.");
+
+        shipment.CurrentLat = request.Latitude;
+        shipment.CurrentLng = request.Longitude;
+        shipment.LocationUpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return new LocationUpdateResponse
+        {
+            ShipmentId = shipment.Id,
+            Latitude = request.Latitude,
+            Longitude = request.Longitude,
+            UpdatedAt = shipment.LocationUpdatedAt.Value
+        };
+    }
+
+    public async Task<DriverShipmentDetailsResponse> PauseTripAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default)
+    {
+        var (shipment, request) = await LoadShipmentOwnedByDriverAsync(driverUserId, shipmentId, cancellationToken);
+        if (shipment.Status != ShipmentStatus.InTransit)
+            throw new InvalidOperationException("Shipment must be in transit before it can be paused.");
+
+        shipment.Status = ShipmentStatus.Paused;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await NotifyMerchantStatusChangeAsync(shipment.Id, "توقف مؤقت", $"تم إيقاف رحلة طلب رقم {request.RequestNumber} مؤقتا", cancellationToken);
+
+        return await BuildDriverShipmentDetailsAsync(shipment, request, cancellationToken);
+    }
+
+    public async Task<DriverShipmentDetailsResponse> ResumeTripAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default)
+    {
+        var (shipment, request) = await LoadShipmentOwnedByDriverAsync(driverUserId, shipmentId, cancellationToken);
+        if (shipment.Status != ShipmentStatus.Paused)
+            throw new InvalidOperationException("Shipment must be paused before it can be resumed.");
+
+        shipment.Status = ShipmentStatus.InTransit;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await NotifyMerchantStatusChangeAsync(shipment.Id, "استئناف الرحلة", $"تم استئناف رحلة طلب رقم {request.RequestNumber}", cancellationToken);
+
+        return await BuildDriverShipmentDetailsAsync(shipment, request, cancellationToken);
     }
 
     /// <summary>
@@ -299,6 +356,33 @@ public sealed class DriverService : IDriverService
             StartedAt = shipment.StartedAt,
             CompletedAt = shipment.CompletedAt
         };
+    }
+
+    /// <summary>
+    /// Sends an FCM notification to the merchant when shipment status changes.
+    /// </summary>
+    private async Task NotifyMerchantStatusChangeAsync(Guid shipmentId, string title, string body, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var shipment = await _db.Shipments.FindAsync([shipmentId], cancellationToken);
+            if (shipment == null) return;
+            var request = await _db.ShipmentRequests.FindAsync([shipment.ShipmentRequestId], cancellationToken);
+            if (request == null) return;
+            var merchantProfile = await _db.MerchantProfiles.FindAsync([request.MerchantProfileId], cancellationToken);
+            if (merchantProfile == null) return;
+            await _notificationService.SendNotificationAsync(
+                merchantProfile.UserId,
+                title,
+                body,
+                null,
+                true,
+                cancellationToken);
+        }
+        catch
+        {
+            // Don't fail the main flow
+        }
     }
 
     private async Task NotifyMerchantShipmentDeliveredAsync(Guid shipmentId, CancellationToken cancellationToken)
