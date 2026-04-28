@@ -31,6 +31,12 @@ readonly SERVICE_NAME="hm"
 readonly HEALTH_URL="https://hm.fustani.cloud/swagger/index.html"
 export PATH="$PATH:/root/.dotnet/tools"
 
+# Disable MSBuild "node reuse" build-server children. They linger 12+ hours
+# and inherit the flock lock fd, blocking subsequent deploys until we manually
+# kill them. Cleaner to not spawn them in the first place.
+export MSBUILDDISABLENODEREUSE=1
+export DOTNET_BUILD_SERVER=0
+
 log()  { printf '\033[0;36m[deploy]\033[0m %s\n' "$*"; }
 fail() { printf '\033[0;31m[deploy:FAIL]\033[0m %s\n' "$*" >&2; exit 1; }
 
@@ -70,7 +76,8 @@ dotnet publish "$SOURCE_DIR/Hm.WebApi/Hm.WebApi.csproj" \
   -c Release \
   -o "$STAGING_DIR" \
   --nologo \
-  -v minimal
+  -v minimal \
+  /nodeReuse:false
 log "build OK; $(find "$STAGING_DIR" -maxdepth 1 -type f | wc -l) files in staging"
 
 # 4. Read production connection string from the (preserved) prod appsettings.
