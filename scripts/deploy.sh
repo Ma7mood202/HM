@@ -74,6 +74,15 @@ if ! dotnet ef database update \
 fi
 log "migrations applied"
 
+# 7. Swap binaries — service is already stopped; explicitly preserve prod-only files.
+log "syncing staging -> $DEPLOY_DIR"
+rsync -a --delete \
+  --exclude='appsettings.json' \
+  --exclude='uploads' \
+  --exclude='Secrets' \
+  "$STAGING_DIR/" "$DEPLOY_DIR/"
+log "swap complete"
+
 # --- Steps will be appended in subsequent tasks ---
 
 log "deploy complete"
