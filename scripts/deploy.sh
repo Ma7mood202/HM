@@ -34,6 +34,15 @@ git checkout main
 git reset --hard origin/main
 log "source at commit: $(git rev-parse --short HEAD)"
 
+# 2. Build (publish) into staging dir.
+log "publishing to $STAGING_DIR"
+dotnet publish "$SOURCE_DIR/Hm.WebApi/Hm.WebApi.csproj" \
+  -c Release \
+  -o "$STAGING_DIR" \
+  --nologo \
+  -v minimal
+log "build OK; $(find "$STAGING_DIR" -maxdepth 1 -type f | wc -l) files in staging"
+
 # --- Steps will be appended in subsequent tasks ---
 
 log "deploy complete"
