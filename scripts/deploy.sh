@@ -19,6 +19,8 @@ cleanup() {
   rm -rf "$STAGING_DIR"
 }
 
+# Restores /var/www/hm from /var/www/hm.prev and restarts the service.
+# Does NOT exit; caller must call fail() afterward.
 rollback() {
   log "ROLLBACK: restoring previous binaries"
   systemctl stop "$SERVICE_NAME" 2>/dev/null || true
@@ -33,13 +35,13 @@ rollback() {
 
 trap cleanup EXIT
 
-# Acquire exclusive lock (non-blocking: fail fast if another deploy is running).
+# 1. Acquire exclusive lock (non-blocking: fail fast if another deploy is running).
 exec 9>"$LOCK_FILE"
 flock -n 9 || fail "another deploy is already in progress"
 
 log "lock acquired; staging dir: $STAGING_DIR"
 
-# 1. Sync source from origin/main.
+# 2. Sync source from origin/main.
 log "syncing source from origin/main"
 cd "$SOURCE_DIR"
 git fetch origin
@@ -47,7 +49,7 @@ git checkout main
 git reset --hard origin/main
 log "source at commit: $(git rev-parse --short HEAD)"
 
-# 2. Build (publish) into staging dir.
+# 3. Build (publish) into staging dir.
 log "publishing to $STAGING_DIR"
 dotnet publish "$SOURCE_DIR/Hm.WebApi/Hm.WebApi.csproj" \
   -c Release \
@@ -56,24 +58,30 @@ dotnet publish "$SOURCE_DIR/Hm.WebApi/Hm.WebApi.csproj" \
   -v minimal
 log "build OK; $(find "$STAGING_DIR" -maxdepth 1 -type f | wc -l) files in staging"
 
-# 3. Snapshot current deployment so we can roll back.
+# 4. Read production connection string from the (preserved) prod appsettings.
+# Reading before stop/backup so a misconfigured appsettings fails fast with no state change.
+log "reading production connection string"
+PROD_CONN="$(jq -r '.ConnectionStrings.DefaultConnection' "$DEPLOY_DIR/appsettings.json")"
+if [[ -z "$PROD_CONN" || "$PROD_CONN" == "null" ]]; then
+  fail "could not read ConnectionStrings.DefaultConnection from $DEPLOY_DIR/appsettings.json"
+fi
+
+# 5. Snapshot current deployment so we can roll back.
+# NOTE: this copies uploads/ which may be large and is excluded from the rsync swap.
+# uploads/ is preserved in-place across deploys; the backup copy exists only so
+# rollback can restore the entire /var/www/hm tree atomically if needed.
 log "backing up current $DEPLOY_DIR to $BACKUP_DIR"
 rm -rf "$BACKUP_DIR"
 cp -a "$DEPLOY_DIR" "$BACKUP_DIR"
 
-# 4. Stop service before touching DB or binaries.
+# 6. Stop service before touching DB or binaries.
 log "stopping $SERVICE_NAME"
 systemctl stop "$SERVICE_NAME"
 
-# 5. Read production connection string from the (preserved) prod appsettings.
-log "reading production connection string"
-PROD_CONN="$(jq -r '.ConnectionStrings.DefaultConnection' "$DEPLOY_DIR/appsettings.json")"
-if [[ -z "$PROD_CONN" || "$PROD_CONN" == "null" ]]; then
-  systemctl start "$SERVICE_NAME" || true
-  fail "could not read ConnectionStrings.DefaultConnection from $DEPLOY_DIR/appsettings.json"
-fi
-
-# 6. Apply EF migrations.
+# 7. Apply EF migrations.
+# --no-build is safe because step 3 already built Release artifacts in $STAGING_DIR
+# and the source-tree bin/ for HM.Infrastructure + Hm.WebApi (dotnet publish writes both).
+# If EF errors with "could not find assembly", drop --no-build to let it rebuild.
 log "applying database migrations"
 if ! dotnet ef database update \
        --project "$SOURCE_DIR/HM.Infrastructure/HM.Infrastructure.csproj" \
@@ -87,7 +95,7 @@ if ! dotnet ef database update \
 fi
 log "migrations applied"
 
-# 7. Swap binaries — service is already stopped; explicitly preserve prod-only files.
+# 8. Swap binaries — service is already stopped; explicitly preserve prod-only files.
 log "syncing staging -> $DEPLOY_DIR"
 rsync -a --delete \
   --exclude='appsettings.json' \
@@ -96,11 +104,11 @@ rsync -a --delete \
   "$STAGING_DIR/" "$DEPLOY_DIR/"
 log "swap complete"
 
-# 8. Start service.
+# 9. Start service.
 log "starting $SERVICE_NAME"
 systemctl start "$SERVICE_NAME"
 
-# 9. Verify systemd reports active within 30s.
+# 10. Verify systemd reports active within 30s, then verify Swagger health.
 log "waiting for service to become active"
 for i in {1..30}; do
   if systemctl is-active --quiet "$SERVICE_NAME"; then
@@ -114,9 +122,10 @@ for i in {1..30}; do
   sleep 1
 done
 
-# 10. Verify Swagger responds 200.
 log "verifying $HEALTH_URL"
-if ! curl -fsS --max-time 10 "$HEALTH_URL" -o /dev/null; then
+# 30s max + 3 retries with 5s delay tolerates JIT-cold ASP.NET startup
+# (loading EF context, SignalR hubs, Firebase SDK).
+if ! curl -fsS --max-time 30 --retry 3 --retry-delay 5 "$HEALTH_URL" -o /dev/null; then
   rollback
   fail "Swagger health-check failed at $HEALTH_URL"
 fi
