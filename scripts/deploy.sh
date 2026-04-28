@@ -60,10 +60,22 @@ log "build OK; $(find "$STAGING_DIR" -maxdepth 1 -type f | wc -l) files in stagi
 
 # 4. Read production connection string from the (preserved) prod appsettings.
 # Reading before stop/backup so a misconfigured appsettings fails fast with no state change.
+# .NET appsettings.json is JSONC (allows // and /* */ comments and trailing commas);
+# stdlib jq rejects those, so we use Python with a minimal JSONC sanitizer.
 log "reading production connection string"
-PROD_CONN="$(jq -r '.ConnectionStrings.DefaultConnection' "$DEPLOY_DIR/appsettings.json")"
-if [[ -z "$PROD_CONN" || "$PROD_CONN" == "null" ]]; then
-  fail "could not read ConnectionStrings.DefaultConnection from $DEPLOY_DIR/appsettings.json"
+PROD_CONN="$(python3 - "$DEPLOY_DIR/appsettings.json" <<'PYEOF'
+import json, re, sys
+with open(sys.argv[1]) as f:
+    content = f.read()
+content = re.sub(r'(?m)^\s*//.*$', '', content)        # strip whole-line // comments
+content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)  # strip /* */ blocks
+content = re.sub(r',(\s*[}\]])', r'\1', content)       # strip trailing commas
+data = json.loads(content)
+print(data['ConnectionStrings']['DefaultConnection'])
+PYEOF
+)" || fail "could not parse $DEPLOY_DIR/appsettings.json"
+if [[ -z "$PROD_CONN" || "$PROD_CONN" == "None" ]]; then
+  fail "ConnectionStrings.DefaultConnection is empty in $DEPLOY_DIR/appsettings.json"
 fi
 
 # 5. Snapshot current deployment so we can roll back.
