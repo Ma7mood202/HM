@@ -43,6 +43,37 @@ dotnet publish "$SOURCE_DIR/Hm.WebApi/Hm.WebApi.csproj" \
   -v minimal
 log "build OK; $(find "$STAGING_DIR" -maxdepth 1 -type f | wc -l) files in staging"
 
+# 3. Snapshot current deployment so we can roll back.
+log "backing up current $DEPLOY_DIR to $BACKUP_DIR"
+rm -rf "$BACKUP_DIR"
+cp -a "$DEPLOY_DIR" "$BACKUP_DIR"
+
+# 4. Stop service before touching DB or binaries.
+log "stopping $SERVICE_NAME"
+systemctl stop "$SERVICE_NAME"
+
+# 5. Read production connection string from the (preserved) prod appsettings.
+log "reading production connection string"
+PROD_CONN="$(jq -r '.ConnectionStrings.DefaultConnection' "$DEPLOY_DIR/appsettings.json")"
+if [[ -z "$PROD_CONN" || "$PROD_CONN" == "null" ]]; then
+  systemctl start "$SERVICE_NAME" || true
+  fail "could not read ConnectionStrings.DefaultConnection from $DEPLOY_DIR/appsettings.json"
+fi
+
+# 6. Apply EF migrations.
+log "applying database migrations"
+if ! dotnet ef database update \
+       --project "$SOURCE_DIR/HM.Infrastructure/HM.Infrastructure.csproj" \
+       --startup-project "$SOURCE_DIR/Hm.WebApi/Hm.WebApi.csproj" \
+       --configuration Release \
+       --no-build \
+       --connection "$PROD_CONN"; then
+  log "migration failed; restarting service from old binaries (swap not yet performed)"
+  systemctl start "$SERVICE_NAME" || true
+  fail "migration failed"
+fi
+log "migrations applied"
+
 # --- Steps will be appended in subsequent tasks ---
 
 log "deploy complete"
