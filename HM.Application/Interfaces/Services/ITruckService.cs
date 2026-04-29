@@ -1,3 +1,4 @@
+using HM.Application.Common.DTOs.Driver;
 using HM.Application.Common.DTOs.Merchant;
 using HM.Application.Common.DTOs.Shipment;
 using HM.Application.Common.DTOs.Truck;
@@ -59,6 +60,12 @@ public interface ITruckService
     /// Generates an invitation link for an external driver (one invitation per shipment).
     /// </summary>
     Task<DriverInvitationDto> GenerateDriverInvitationAsync(Guid truckAccountId, Guid shipmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns a paginated list of all driver profiles in the system, for the truck account to pick from when assigning.
+    /// Optional case-insensitive search on FullName.
+    /// </summary>
+    Task<PaginatedResult<DriverSummaryDto>> GetAvailableDriversAsync(string? search, PaginationRequest pagination, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets all shipments assigned to the truck account.

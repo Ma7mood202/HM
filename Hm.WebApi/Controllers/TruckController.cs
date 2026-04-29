@@ -158,6 +158,15 @@ public class TruckController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>List all drivers in the system that the truck account can assign to a shipment. Supports search + pagination.</summary>
+    [HttpGet("drivers")]
+    public async Task<IActionResult> GetAvailableDrivers([FromQuery] string? search, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, CancellationToken cancellationToken = default)
+    {
+        var pagination = new PaginationRequest { PageNumber = pageNumber, PageSize = pageSize };
+        var result = await _truckService.GetAvailableDriversAsync(search, pagination, cancellationToken);
+        return Ok(result);
+    }
+
     /// <summary>Get shipments assigned to the current truck account.</summary>
     [HttpGet("shipments")]
     public async Task<IActionResult> GetMyShipments([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, CancellationToken cancellationToken = default)

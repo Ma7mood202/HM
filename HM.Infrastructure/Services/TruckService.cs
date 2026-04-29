@@ -1,4 +1,5 @@
 using AutoMapper;
+using HM.Application.Common.DTOs.Driver;
 using HM.Application.Common.DTOs.Merchant;
 using HM.Application.Common.DTOs.Shipment;
 using HM.Application.Common.DTOs.Truck;
@@ -458,6 +459,52 @@ public sealed class TruckService : ITruckService
             InvitationUrl = $"invite/{invitation.Token}",
             ExpiresAt = invitation.ExpiresAt,
             CreatedAt = invitation.CreatedAt
+        };
+    }
+
+    public async Task<PaginatedResult<DriverSummaryDto>> GetAvailableDriversAsync(string? search, PaginationRequest pagination, CancellationToken cancellationToken = default)
+    {
+        IQueryable<DriverProfile> query = _db.DriverProfiles.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search.Trim()}%";
+            // ILike is the case-insensitive LIKE operator on Postgres (Npgsql).
+            query = query.Where(d => EF.Functions.ILike(d.FullName, pattern));
+        }
+
+        var pageNumber = pagination.PageNumber < 1 ? 1 : pagination.PageNumber;
+        var pageSize = pagination.PageSize < 1 ? 10 : Math.Min(pagination.PageSize, 50);
+
+        var total = await query.CountAsync(cancellationToken);
+        var drivers = await query
+            .OrderBy(d => d.FullName)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var userIds = drivers.Where(d => d.UserId.HasValue).Select(d => d.UserId!.Value).Distinct().ToList();
+        var users = userIds.Count > 0
+            ? await _db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, cancellationToken)
+            : new Dictionary<Guid, HM.Domain.Entities.User>();
+
+        var items = drivers.Select(d => new DriverSummaryDto
+        {
+            Id = d.Id,
+            FullName = d.FullName,
+            PhoneNumber = d.UserId.HasValue && users.TryGetValue(d.UserId.Value, out var u) ? u.PhoneNumber : null,
+            AvatarUrl = d.AvatarUrl,
+            IsVerified = d.IsVerified,
+            HasNationalId = !string.IsNullOrEmpty(d.NationalIdFrontImageUrl) && !string.IsNullOrEmpty(d.NationalIdBackImageUrl),
+            CreatedAt = d.CreatedAt
+        }).ToList();
+
+        return new PaginatedResult<DriverSummaryDto>
+        {
+            Items = items,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalCount = total
         };
     }
 
