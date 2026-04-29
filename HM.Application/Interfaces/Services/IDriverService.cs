@@ -44,6 +44,16 @@ public interface IDriverService
     Task<AssignedShipmentDto> GetAssignedShipmentAsync(Guid driverProfileId, Guid shipmentId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Driver accepts an assignment in PendingDriverAcceptance state. Transitions to Ready.
+    /// </summary>
+    Task<DriverShipmentDetailsResponse> AcceptAssignmentAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Driver rejects an assignment in PendingDriverAcceptance state. Reverts to AwaitingDriver and clears DriverProfileId.
+    /// </summary>
+    Task<DriverShipmentDetailsResponse> RejectAssignmentAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets full shipment details for the driver details screen (by current user id).
     /// </summary>
     Task<DriverShipmentDetailsResponse> GetMyShipmentDetailsAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default);
