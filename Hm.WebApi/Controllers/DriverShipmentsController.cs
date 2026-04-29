@@ -39,6 +39,44 @@ public class DriverShipmentsController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>Driver accepts an assignment in PendingDriverAcceptance. Transitions to Ready.</summary>
+    [HttpPost("{shipmentId:guid}/accept")]
+    public async Task<IActionResult> AcceptAssignment(Guid shipmentId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        var result = await _driverService.AcceptAssignmentAsync(userId, shipmentId, cancellationToken);
+
+        await _hubContext.Clients
+            .Group($"shipment-{shipmentId}")
+            .SendAsync("StatusChanged", new ShipmentStatusChangeEvent
+            {
+                ShipmentId = shipmentId,
+                Status = result.Status,
+                ChangedAt = DateTime.UtcNow
+            }, cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>Driver rejects an assignment in PendingDriverAcceptance. Reverts to AwaitingDriver.</summary>
+    [HttpPost("{shipmentId:guid}/reject")]
+    public async Task<IActionResult> RejectAssignment(Guid shipmentId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        var result = await _driverService.RejectAssignmentAsync(userId, shipmentId, cancellationToken);
+
+        await _hubContext.Clients
+            .Group($"shipment-{shipmentId}")
+            .SendAsync("StatusChanged", new ShipmentStatusChangeEvent
+            {
+                ShipmentId = shipmentId,
+                Status = result.Status,
+                ChangedAt = DateTime.UtcNow
+            }, cancellationToken);
+
+        return Ok(result);
+    }
+
     [HttpPost("{shipmentId:guid}/start")]
     public async Task<IActionResult> StartTrip(Guid shipmentId, CancellationToken cancellationToken)
     {
