@@ -18,11 +18,13 @@ public sealed class TruckService : ITruckService
 {
     private readonly IApplicationDbContext _db;
     private readonly IMapper _mapper;
+    private readonly INotificationService _notificationService;
 
-    public TruckService(IApplicationDbContext db, IMapper mapper)
+    public TruckService(IApplicationDbContext db, IMapper mapper, INotificationService notificationService)
     {
         _db = db;
         _mapper = mapper;
+        _notificationService = notificationService;
     }
 
     public async Task<TruckProfileDto> GetMyProfileAsync(Guid truckUserId, CancellationToken cancellationToken = default)
@@ -379,6 +381,8 @@ public sealed class TruckService : ITruckService
         var offer = await _db.ShipmentOffers.FindAsync([shipment.AcceptedOfferId], cancellationToken);
         if (offer == null || offer.TruckAccountId != truckAccountId)
             throw new UnauthorizedAccessException("Shipment not found or not assigned to this truck account.");
+
+        // Allow assigning when no driver yet (AwaitingDriver) OR when re-assigning after a previous decline/timeout (also AwaitingDriver).
         if (shipment.Status != ShipmentStatus.AwaitingDriver)
             throw new InvalidOperationException("Driver can only be assigned when shipment is awaiting driver.");
 
@@ -387,8 +391,29 @@ public sealed class TruckService : ITruckService
             throw new KeyNotFoundException("Driver not found.");
 
         shipment.DriverProfileId = driverProfileId;
-        shipment.Status = ShipmentStatus.Ready;
+        shipment.Status = ShipmentStatus.PendingDriverAcceptance;
+        shipment.AssignedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
+
+        // Notify the driver. Don't fail the main flow if notification fails.
+        if (driver.UserId.HasValue)
+        {
+            try
+            {
+                var data = System.Text.Json.JsonSerializer.Serialize(new { shipmentId = shipment.Id });
+                await _notificationService.SendNotificationAsync(
+                    driver.UserId.Value,
+                    "تم تعيينك على شحنة",
+                    "اضغط للقبول أو الرفض. ستلغى الشحنة تلقائياً بعد 15 دقيقة في حال عدم الرد.",
+                    data,
+                    true,
+                    cancellationToken);
+            }
+            catch
+            {
+                // Non-fatal
+            }
+        }
 
         return await BuildShipmentDetailsDtoAsync(shipment.Id, cancellationToken);
     }
