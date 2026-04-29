@@ -58,6 +58,9 @@ Thumbs.db
 # Deploy
 deploy/
 
+# Git worktrees
+.worktrees/
+
 # Reference / local
 SERVER-REFERENCE.md
 HM.postman_collection.json
