@@ -160,12 +160,21 @@ done
 
 log "verifying $HEALTH_URL"
 # 30s max + 3 retries with 5s delay tolerates JIT-cold ASP.NET startup
-# (loading EF context, SignalR hubs, Firebase SDK).
-if ! curl -fsS --max-time 30 --retry 3 --retry-delay 5 "$HEALTH_URL" -o /dev/null; then
+# (loading EF context, SignalR hubs, Firebase SDK). curl --retry retries
+# automatically on 5xx/timeouts so transient startup errors don't fail us.
+# We capture the final HTTP status explicitly rather than relying on -f, so
+# the success path can log the actual code (helps catch silent regressions
+# like a redirect to /swagger sneaking in) and the failure path reports
+# what we actually got. -s silences retry diagnostics; "000" means curl
+# couldn't reach the server at all (connection refused, DNS, timeout).
+HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+  --max-time 30 --retry 3 --retry-delay 5 \
+  "$HEALTH_URL" || echo "000")
+if [[ "$HEALTH_STATUS" != "200" ]]; then
   rollback
-  fail "Swagger health-check failed at $HEALTH_URL"
+  fail "Swagger health-check returned HTTP $HEALTH_STATUS (expected 200) at $HEALTH_URL"
 fi
-log "health-check OK"
+log "health-check OK (HTTP $HEALTH_STATUS)"
 
 # Shut down dotnet build servers (MSBuild + VBCSCompiler + Razor). They inherit
 # the flock lock fd and would block subsequent deploys. The MSBUILDDISABLENODEREUSE
