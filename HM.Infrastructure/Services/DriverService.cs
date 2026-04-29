@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AutoMapper;
 using HM.Application.Common.DTOs.Driver;
 using HM.Application.Common.DTOs.Shipment;
@@ -6,6 +7,7 @@ using HM.Application.Interfaces.Services;
 using HM.Domain.Entities;
 using HM.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HM.Infrastructure.Services;
 
@@ -17,12 +19,14 @@ public sealed class DriverService : IDriverService
     private readonly IApplicationDbContext _db;
     private readonly IMapper _mapper;
     private readonly INotificationService _notificationService;
+    private readonly ILogger<DriverService> _logger;
 
-    public DriverService(IApplicationDbContext db, IMapper mapper, INotificationService notificationService)
+    public DriverService(IApplicationDbContext db, IMapper mapper, INotificationService notificationService, ILogger<DriverService> logger)
     {
         _db = db;
         _mapper = mapper;
         _notificationService = notificationService;
+        _logger = logger;
     }
 
     public async Task<DriverProfileDto> GetMyProfileAsync(Guid driverUserId, CancellationToken cancellationToken = default)
@@ -156,6 +160,64 @@ public sealed class DriverService : IDriverService
         dto.Notes = request.Notes;
         dto.TruckPlateNumber = truck?.PlateNumber;
         return dto;
+    }
+
+    public async Task<DriverShipmentDetailsResponse> AcceptAssignmentAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default)
+    {
+        var (shipment, request) = await LoadShipmentOwnedByDriverAsync(driverUserId, shipmentId, cancellationToken);
+        if (shipment.Status != ShipmentStatus.PendingDriverAcceptance)
+            throw new InvalidOperationException("Assignment is not awaiting your acceptance.");
+
+        shipment.Status = ShipmentStatus.Ready;
+        shipment.AssignedAt = null;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await NotifyTruckAccountOfAssignmentResponseAsync(shipment, request, accepted: true, cancellationToken);
+
+        return await BuildDriverShipmentDetailsAsync(shipment, request, cancellationToken);
+    }
+
+    public async Task<DriverShipmentDetailsResponse> RejectAssignmentAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default)
+    {
+        var (shipment, request) = await LoadShipmentOwnedByDriverAsync(driverUserId, shipmentId, cancellationToken);
+        if (shipment.Status != ShipmentStatus.PendingDriverAcceptance)
+            throw new InvalidOperationException("Assignment is not awaiting your acceptance.");
+
+        shipment.Status = ShipmentStatus.AwaitingDriver;
+        shipment.DriverProfileId = null;
+        shipment.AssignedAt = null;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await NotifyTruckAccountOfAssignmentResponseAsync(shipment, request, accepted: false, cancellationToken);
+
+        return await BuildDriverShipmentDetailsAsync(shipment, request, cancellationToken);
+    }
+
+    private async Task NotifyTruckAccountOfAssignmentResponseAsync(Shipment shipment, ShipmentRequest request, bool accepted, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var offer = await _db.ShipmentOffers.FindAsync([shipment.AcceptedOfferId], cancellationToken);
+            if (offer == null) return;
+            var truckAccount = await _db.TruckAccounts.FindAsync([offer.TruckAccountId], cancellationToken);
+            if (truckAccount == null) return;
+            var title = accepted ? "قبل السائق الشحنة" : "رفض السائق الشحنة";
+            var body = accepted
+                ? $"قبل السائق الشحنة رقم {request.RequestNumber} وأصبحت جاهزة للانطلاق."
+                : $"رفض السائق الشحنة رقم {request.RequestNumber}. يرجى تعيين سائق آخر.";
+            var data = JsonSerializer.Serialize(new { shipmentId = shipment.Id });
+            await _notificationService.SendNotificationAsync(
+                truckAccount.UserId,
+                title,
+                body,
+                data,
+                true,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to notify truck account of driver assignment response (shipment {ShipmentId}, accepted={Accepted})", shipment.Id, accepted);
+        }
     }
 
     public async Task<DriverShipmentDetailsResponse> GetMyShipmentDetailsAsync(Guid driverUserId, Guid shipmentId, CancellationToken cancellationToken = default)
