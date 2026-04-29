@@ -131,6 +131,19 @@ public class MerchantController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>List the merchant's shipments (accepted-offer onwards). Optional ShipmentStatus filter.</summary>
+    [HttpGet("shipments")]
+    public async Task<IActionResult> GetMyShipments(
+        [FromQuery] ShipmentStatus? status,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetUserId();
+        var result = await _merchantService.GetMyShipmentsAsync(userId, status, pageNumber, pageSize, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet("shipments/{shipmentId:guid}/tracking")]
     public async Task<IActionResult> GetTracking(Guid shipmentId, CancellationToken cancellationToken)
     {

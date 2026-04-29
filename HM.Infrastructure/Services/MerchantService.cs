@@ -382,6 +382,121 @@ public sealed class MerchantService : IMerchantService
         await _db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<PaginatedResult<MerchantShipmentSummaryDto>> GetMyShipmentsAsync(Guid userId, ShipmentStatus? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+    {
+        var profileId = await ResolveMerchantProfileIdAsync(userId, cancellationToken);
+
+        var requestIds = await _db.ShipmentRequests
+            .AsNoTracking()
+            .Where(r => r.MerchantProfileId == profileId)
+            .Select(r => r.Id)
+            .ToListAsync(cancellationToken);
+
+        if (requestIds.Count == 0)
+        {
+            return new PaginatedResult<MerchantShipmentSummaryDto>
+            {
+                Items = new List<MerchantShipmentSummaryDto>(),
+                PageNumber = pageNumber < 1 ? 1 : pageNumber,
+                PageSize = pageSize < 1 ? 10 : Math.Min(pageSize, 50),
+                TotalCount = 0
+            };
+        }
+
+        var query = _db.Shipments.AsNoTracking().Where(s => requestIds.Contains(s.ShipmentRequestId));
+        if (status.HasValue)
+            query = query.Where(s => s.Status == status.Value);
+
+        pageNumber = pageNumber < 1 ? 1 : pageNumber;
+        pageSize = pageSize < 1 ? 10 : Math.Min(pageSize, 50);
+
+        var total = await query.CountAsync(cancellationToken);
+        var shipments = await query
+            // Terminal-state shipments (Completed, Cancelled) drop to the bottom; among non-terminal,
+            // most-recently-started first. This puts actively-tracked shipments above finished ones.
+            .OrderBy(s => s.Status == ShipmentStatus.Completed || s.Status == ShipmentStatus.Cancelled ? 1 : 0)
+            .ThenByDescending(s => s.StartedAt ?? DateTime.MinValue)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        // Scope subsequent batch loads to only the request IDs on the current page,
+        // not the full merchant set, to keep the IN(...) predicate small.
+        var pageRequestIds = shipments.Select(s => s.ShipmentRequestId).Distinct().ToList();
+        var requestLookup = pageRequestIds.Count > 0
+            ? await _db.ShipmentRequests
+                .AsNoTracking()
+                .Where(r => pageRequestIds.Contains(r.Id))
+                .ToDictionaryAsync(r => r.Id, cancellationToken)
+            : new Dictionary<Guid, HM.Domain.Entities.ShipmentRequest>();
+
+        var offerIds = shipments.Select(s => s.AcceptedOfferId).Distinct().ToList();
+        var offers = offerIds.Count > 0
+            ? await _db.ShipmentOffers.AsNoTracking().Where(o => offerIds.Contains(o.Id)).ToDictionaryAsync(o => o.Id, cancellationToken)
+            : new Dictionary<Guid, HM.Domain.Entities.ShipmentOffer>();
+
+        var truckIds = shipments.Select(s => s.TruckId).Distinct().ToList();
+        var trucks = truckIds.Count > 0
+            ? await _db.Trucks.AsNoTracking().Where(t => truckIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, cancellationToken)
+            : new Dictionary<Guid, HM.Domain.Entities.Truck>();
+
+        var driverIds = shipments.Where(s => s.DriverProfileId.HasValue).Select(s => s.DriverProfileId!.Value).Distinct().ToList();
+        var drivers = driverIds.Count > 0
+            ? await _db.DriverProfiles.AsNoTracking().Where(d => driverIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken)
+            : new Dictionary<Guid, HM.Domain.Entities.DriverProfile>();
+
+        var driverUserIds = drivers.Values.Where(d => d.UserId.HasValue).Select(d => d.UserId!.Value).Distinct().ToList();
+        var driverUsers = driverUserIds.Count > 0
+            ? await _db.Users.AsNoTracking().Where(u => driverUserIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, cancellationToken)
+            : new Dictionary<Guid, HM.Domain.Entities.User>();
+
+        var regionIds = requestLookup.Values.SelectMany(r => new[] { r.PickupRegionId, r.DropoffRegionId }).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+        var regions = regionIds.Count > 0
+            ? await _db.Regions.AsNoTracking().Where(r => regionIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, cancellationToken)
+            : new Dictionary<Guid, HM.Domain.Entities.Region>();
+
+        var items = shipments.Select(s =>
+        {
+            var req = requestLookup.GetValueOrDefault(s.ShipmentRequestId);
+            var offer = offers.GetValueOrDefault(s.AcceptedOfferId);
+            var truck = trucks.GetValueOrDefault(s.TruckId);
+            var driver = s.DriverProfileId.HasValue ? drivers.GetValueOrDefault(s.DriverProfileId.Value) : null;
+            var driverUser = driver != null && driver.UserId.HasValue ? driverUsers.GetValueOrDefault(driver.UserId.Value) : null;
+
+            return new MerchantShipmentSummaryDto
+            {
+                ShipmentId = s.Id,
+                ShipmentRequestId = s.ShipmentRequestId,
+                RequestNumber = req?.RequestNumber ?? "",
+                Status = s.Status,
+                PickupLocation = req?.PickupLocation ?? "",
+                DropoffLocation = req?.DropoffLocation ?? "",
+                PickupRegion = req?.PickupRegionId.HasValue == true && regions.TryGetValue(req.PickupRegionId.Value, out var pr) ? pr.NameEn : null,
+                DropoffRegion = req?.DropoffRegionId.HasValue == true && regions.TryGetValue(req.DropoffRegionId.Value, out var dr) ? dr.NameEn : null,
+                DriverName = driver?.FullName,
+                DriverPhone = driverUser?.PhoneNumber,
+                DriverAvatarUrl = driver?.AvatarUrl,
+                TruckPlateNumber = truck?.PlateNumber,
+                TruckType = truck?.TruckType,
+                Price = offer?.Price ?? 0,
+                CurrentLat = s.CurrentLat,
+                CurrentLng = s.CurrentLng,
+                LastLocationUpdatedAt = s.LocationUpdatedAt,
+                StartedAt = s.StartedAt,
+                CompletedAt = s.CompletedAt,
+                CreatedAt = req?.CreatedAt ?? DateTime.MinValue
+            };
+        }).ToList();
+
+        return new PaginatedResult<MerchantShipmentSummaryDto>
+        {
+            Items = items,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalCount = total
+        };
+    }
+
     public async Task<ShipmentTrackingResponse> GetTrackingAsync(Guid userId, Guid shipmentIdOrRequestId, CancellationToken cancellationToken = default)
     {
         var profileId = await ResolveMerchantProfileIdAsync(userId, cancellationToken);

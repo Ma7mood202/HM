@@ -1,5 +1,6 @@
 using HM.Application.Common.DTOs.Merchant;
 using HM.Application.Common.Models;
+using HM.Domain.Enums;
 
 namespace HM.Application.Interfaces.Services;
 
@@ -25,6 +26,13 @@ public interface IMerchantService
     Task RejectOfferAsync(Guid userId, Guid shipmentRequestId, Guid offerId, CancellationToken cancellationToken = default);
 
     Task CancelShipmentRequestAsync(Guid userId, Guid shipmentRequestId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns a paginated list of the merchant's shipments (accepted-offer onwards), with status,
+    /// driver info, truck info, and last known location for the tracking list.
+    /// Optional filter by ShipmentStatus.
+    /// </summary>
+    Task<PaginatedResult<MerchantShipmentSummaryDto>> GetMyShipmentsAsync(Guid userId, ShipmentStatus? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
 
     Task<ShipmentTrackingResponse> GetTrackingAsync(Guid userId, Guid shipmentIdOrRequestId, CancellationToken cancellationToken = default);
 }
