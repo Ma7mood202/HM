@@ -441,9 +441,9 @@ public sealed class DriverService : IDriverService
                 true,
                 cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
-            // Don't fail the main flow
+            _logger.LogWarning(ex, "Failed to notify merchant of status change for shipment {ShipmentId} ({Title})", shipmentId, title);
         }
     }
 
@@ -467,9 +467,9 @@ public sealed class DriverService : IDriverService
                 true,
                 cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
-            // Don't fail the main flow
+            _logger.LogWarning(ex, "Failed to notify merchant of delivery for shipment {ShipmentId}", shipmentId);
         }
     }
 }
