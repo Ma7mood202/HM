@@ -362,7 +362,15 @@ public sealed class AuthService : IAuthService
         var shipment = await _db.Shipments.FindAsync([invitation.ShipmentId], cancellationToken);
         if (shipment != null)
         {
+            // QR / deep-link claim is only valid while the shipment is still awaiting a driver.
+            // Pending direct assignments (PendingDriverAcceptance), in-transit, completed, and
+            // cancelled shipments cannot be claimed via invitation.
+            if (shipment.Status != ShipmentStatus.AwaitingDriver)
+                throw new InvalidOperationException("Shipment is no longer accepting a driver.");
+
             shipment.DriverProfileId = driverProfile.Id;
+            shipment.Status = ShipmentStatus.Ready;
+            shipment.AssignedAt = null;
         }
 
         await _db.SaveChangesAsync(cancellationToken);
