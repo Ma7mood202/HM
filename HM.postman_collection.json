@@ -1,0 +1,1432 @@
+{
+	"info": {
+		"_postman_id": "hm-api-collection",
+		"name": "HM",
+		"description": "HM Logistics API - Postman Collection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://localhost:5001",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "shipmentRequestId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
+			"key": "shipmentId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
+			"key": "offerId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
+			"key": "notificationId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
+			"key": "truckId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
+			"key": "driverProfileId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
+			"key": "governorateId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
+			"key": "pickupGovernorateId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
+			"key": "pickupRegionId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
+			"key": "dropoffGovernorateId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
+			"key": "dropoffRegionId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
+			"key": "invitationToken",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "FullName",
+									"value": "John Doe",
+									"type": "text"
+								},
+								{
+									"key": "PhoneNumber",
+									"value": "+201234567890",
+									"type": "text"
+								},
+								{
+									"key": "Email",
+									"value": "john@example.com",
+									"type": "text"
+								},
+								{
+									"key": "Password",
+									"value": "Password@123",
+									"type": "text"
+								},
+								{
+									"key": "UserType",
+									"value": "0",
+									"description": "0=Merchant, 1=TruckAccount, 2=Driver",
+									"type": "text"
+								},
+								{
+									"key": "NationalIdFrontImage",
+									"type": "file",
+									"src": "",
+									"description": "Required for Driver registration"
+								},
+								{
+									"key": "NationalIdBackImage",
+									"type": "file",
+									"src": "",
+									"description": "Required for Driver registration"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "register"]
+						}
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.token) {",
+									"    pm.collectionVariables.set('token', jsonData.data.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"+201234567890\",\n  \"password\": \"Password@123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "Verify OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"+201234567890\",\n  \"otpCode\": \"123456\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/verify-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "verify-otp"]
+						}
+					}
+				},
+				{
+					"name": "Resend OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"+201234567890\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/resend-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "resend-otp"]
+						}
+					}
+				},
+				{
+					"name": "Forgot Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"+201234567890\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/forgot-password",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "forgot-password"]
+						}
+					}
+				},
+				{
+					"name": "Reset Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"+201234567890\",\n  \"otpCode\": \"123456\",\n  \"newPassword\": \"NewPassword@123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/reset-password",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "reset-password"]
+						}
+					}
+				},
+				{
+					"name": "Change Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"currentPassword\": \"Password@123\",\n  \"newPassword\": \"NewPassword@123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/change-password",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "change-password"]
+						}
+					}
+				},
+				{
+					"name": "Driver Accept Invitation",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "FullName",
+									"value": "Driver Name",
+									"type": "text"
+								},
+								{
+									"key": "PhoneNumber",
+									"value": "+201234567891",
+									"type": "text"
+								},
+								{
+									"key": "Email",
+									"value": "driver@example.com",
+									"type": "text"
+								},
+								{
+									"key": "Password",
+									"value": "Password@123",
+									"type": "text"
+								},
+								{
+									"key": "UserType",
+									"value": "2",
+									"description": "2=Driver",
+									"type": "text"
+								},
+								{
+									"key": "NationalIdFrontImage",
+									"type": "file",
+									"src": ""
+								},
+								{
+									"key": "NationalIdBackImage",
+									"type": "file",
+									"src": ""
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/driver/accept-invitation?token={{invitationToken}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "driver", "accept-invitation"],
+							"query": [
+								{
+									"key": "token",
+									"value": "{{invitationToken}}"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Driver",
+			"item": [
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "profile"]
+						}
+					}
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "FullName",
+									"value": "Updated Driver Name",
+									"type": "text"
+								},
+								{
+									"key": "PhoneNumber",
+									"value": "+201234567890",
+									"type": "text"
+								},
+								{
+									"key": "Avatar",
+									"type": "file",
+									"src": ""
+								},
+								{
+									"key": "NationalIdFrontImage",
+									"type": "file",
+									"src": ""
+								},
+								{
+									"key": "NationalIdBackImage",
+									"type": "file",
+									"src": ""
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "profile"]
+						}
+					}
+				},
+				{
+					"name": "Upload National ID",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "NationalIdFrontImage",
+									"type": "file",
+									"src": ""
+								},
+								{
+									"key": "NationalIdBackImage",
+									"type": "file",
+									"src": ""
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "id"]
+						}
+					}
+				},
+				{
+					"name": "Start Shipment",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}/start",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}", "start"]
+						}
+					}
+				},
+				{
+					"name": "Pause Shipment",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}/pause",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}", "pause"]
+						}
+					}
+				},
+				{
+					"name": "Complete Shipment",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}/complete",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}", "complete"]
+						}
+					}
+				},
+				{
+					"name": "Get Shipment By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "DriverShipments",
+			"item": [
+				{
+					"name": "Get Shipment Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}"]
+						}
+					}
+				},
+				{
+					"name": "Accept Assignment",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "" },
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}/accept",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}", "accept"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reject Assignment",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "" },
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}/reject",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}", "reject"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Start Shipment",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}/start",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}", "start"]
+						}
+					}
+				},
+				{
+					"name": "Arrive at Shipment",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}/arrive",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}", "arrive"]
+						}
+					}
+				},
+				{
+					"name": "Mark Shipment Received",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}/received",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}", "received"]
+						}
+					}
+				},
+				{
+					"name": "Get Shipment Tracking",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}/tracking",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}", "tracking"]
+						}
+					}
+				},
+				{
+					"name": "Update Location (GPS)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"latitude\": 33.5138,\n  \"longitude\": 36.2765\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}/update-location",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}", "update-location"]
+						},
+						"description": "Driver sends current GPS coordinates. Only allowed when shipment status is InTransit. Pushes 'LocationUpdated' event to SignalR group 'shipment-{id}'. Latitude: -90 to 90. Longitude: -180 to 180."
+					}
+				},
+				{
+					"name": "Pause Trip",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}/pause",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}", "pause"]
+						},
+						"description": "Pause the trip (استراحة). Allowed when status is InTransit -> Paused. Pushes 'StatusChanged' event via SignalR and sends FCM notification to merchant."
+					}
+				},
+				{
+					"name": "Resume Trip",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/driver/shipments/{{shipmentId}}/resume",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "driver", "shipments", "{{shipmentId}}", "resume"]
+						},
+						"description": "Resume the trip (استئناف). Allowed when status is Paused -> InTransit. Pushes 'StatusChanged' event via SignalR and sends FCM notification to merchant."
+					}
+				}
+			]
+		},
+		{
+			"name": "Location",
+			"item": [
+				{
+					"name": "Get Governorates",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"auth": {
+							"type": "noauth"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/governorates",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "governorates"]
+						}
+					}
+				},
+				{
+					"name": "Get Regions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"auth": {
+							"type": "noauth"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/regions?governorateId={{governorateId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "regions"],
+							"query": [
+								{
+									"key": "governorateId",
+									"value": "{{governorateId}}",
+									"description": "Optional - filter regions by governorate"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Merchant",
+			"item": [
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/merchant/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "merchant", "profile"]
+						}
+					}
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "FullName",
+									"value": "Updated Merchant Name",
+									"type": "text"
+								},
+								{
+									"key": "Avatar",
+									"type": "file",
+									"src": ""
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/merchant/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "merchant", "profile"]
+						}
+					}
+				},
+				{
+					"name": "Create Shipment Request",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"truckType\": 1,\n  \"truckBodyType\": 1,\n  \"senderName\": \"Ahmed Mohamed\",\n  \"senderPhone\": \"+201234567890\",\n  \"receiverPhoneNumber\": \"+201098765432\",\n  \"pickupGovernorateId\": \"{{pickupGovernorateId}}\",\n  \"pickupRegionId\": \"{{pickupRegionId}}\",\n  \"pickupAddressText\": \"123 Main Street, Cairo\",\n  \"pickupArea\": \"Nasr City\",\n  \"dropoffGovernorateId\": \"{{dropoffGovernorateId}}\",\n  \"dropoffRegionId\": \"{{dropoffRegionId}}\",\n  \"dropoffAddressText\": \"456 Second Street, Alexandria\",\n  \"dropoffArea\": \"Smouha\",\n  \"parcelDescription\": \"Electronics equipment\",\n  \"parcelType\": \"Electronics\",\n  \"parcelWeightTon\": 2.5,\n  \"parcelSize\": \"Large\",\n  \"parcelCount\": 3,\n  \"isFragile\": true,\n  \"deliveryDate\": \"2026-04-15\",\n  \"deliveryTimeFrom\": \"09:00\",\n  \"deliveryTimeTo\": \"17:00\",\n  \"notes\": \"Handle with care, fragile items\",\n  \"paymentMethod\": 0\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/merchant/shipment-requests",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "merchant", "shipment-requests"]
+						},
+						"description": "TruckType: 0=Small, 1=Medium, 2=Large\nTruckBodyType: 0=Open, 1=Closed, 2=Refrigerated\nPaymentMethod: 0=CashOnDelivery, 1=Online, 2=Wallet"
+					}
+				},
+				{
+					"name": "Create Shipment Request (Alt Route)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"truckType\": 0,\n  \"truckBodyType\": 0,\n  \"senderName\": \"Sara Ali\",\n  \"senderPhone\": \"+201111111111\",\n  \"receiverPhoneNumber\": \"+201222222222\",\n  \"pickupGovernorateId\": \"{{pickupGovernorateId}}\",\n  \"pickupRegionId\": \"{{pickupRegionId}}\",\n  \"pickupAddressText\": \"789 Third Street, Giza\",\n  \"pickupArea\": \"Dokki\",\n  \"dropoffGovernorateId\": \"{{dropoffGovernorateId}}\",\n  \"dropoffRegionId\": \"{{dropoffRegionId}}\",\n  \"dropoffAddressText\": \"321 Fourth Street, Luxor\",\n  \"dropoffArea\": \"East Bank\",\n  \"parcelDescription\": \"Furniture set\",\n  \"parcelType\": \"Furniture\",\n  \"parcelWeightTon\": 1.0,\n  \"parcelSize\": \"Medium\",\n  \"parcelCount\": 1,\n  \"isFragile\": false,\n  \"deliveryDate\": \"2026-04-20\",\n  \"deliveryTimeFrom\": \"08:00\",\n  \"deliveryTimeTo\": \"14:00\",\n  \"notes\": \"\",\n  \"paymentMethod\": 1\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/merchant/shipment/shipment-requests",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "merchant", "shipment", "shipment-requests"]
+						}
+					}
+				},
+				{
+					"name": "Get Shipment Requests",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/merchant/shipment-requests?status=1&search=&dateFrom=2026-01-01&dateTo=2026-12-31&pageNumber=1&pageSize=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "merchant", "shipment-requests"],
+							"query": [
+								{
+									"key": "status",
+									"value": "1",
+									"description": "0=Draft, 1=Open, 2=OfferAccepted, 3=InProgress, 4=Cancelled, 5=Expired, 6=Completed"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"description": "Search term (optional)"
+								},
+								{
+									"key": "dateFrom",
+									"value": "2026-01-01",
+									"description": "Filter from date (optional)"
+								},
+								{
+									"key": "dateTo",
+									"value": "2026-12-31",
+									"description": "Filter to date (optional)"
+								},
+								{
+									"key": "pageNumber",
+									"value": "1"
+								},
+								{
+									"key": "pageSize",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Shipment Request By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/merchant/shipment-requests/{{shipmentRequestId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "merchant", "shipment-requests", "{{shipmentRequestId}}"]
+						}
+					}
+				},
+				{
+					"name": "Get Shipment Request Offers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/merchant/shipment-requests/{{shipmentRequestId}}/offers",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "merchant", "shipment-requests", "{{shipmentRequestId}}", "offers"]
+						}
+					}
+				},
+				{
+					"name": "Accept Offer",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/merchant/shipment-requests/{{shipmentRequestId}}/offers/{{offerId}}/accept",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "merchant", "shipment-requests", "{{shipmentRequestId}}", "offers", "{{offerId}}", "accept"]
+						}
+					}
+				},
+				{
+					"name": "Reject Offer",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/merchant/shipment-requests/{{shipmentRequestId}}/offers/{{offerId}}/reject",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "merchant", "shipment-requests", "{{shipmentRequestId}}", "offers", "{{offerId}}", "reject"]
+						}
+					}
+				},
+				{
+					"name": "Cancel Shipment Request",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/merchant/shipment-requests/{{shipmentRequestId}}/cancel",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "merchant", "shipment-requests", "{{shipmentRequestId}}", "cancel"]
+						}
+					}
+				},
+				{
+					"name": "Get My Shipments",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/merchant/shipments?pageNumber=1&pageSize=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "merchant", "shipments"],
+							"query": [
+								{ "key": "pageNumber", "value": "1" },
+								{ "key": "pageSize", "value": "10" },
+								{ "key": "status", "value": "InTransit", "disabled": true }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Shipment Tracking",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/merchant/shipments/{{shipmentId}}/tracking",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "merchant", "shipments", "{{shipmentId}}", "tracking"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Notification",
+			"item": [
+				{
+					"name": "Get All Notifications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications"]
+						}
+					}
+				},
+				{
+					"name": "Get Unseen Count",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/unseen-count",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications", "unseen-count"]
+						}
+					}
+				},
+				{
+					"name": "Get Notification By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/{{notificationId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications", "{{notificationId}}"]
+						}
+					}
+				},
+				{
+					"name": "Mark Notification as Seen",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/{{notificationId}}/mark-seen",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications", "{{notificationId}}", "mark-seen"]
+						}
+					}
+				},
+				{
+					"name": "Mark All as Seen",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/mark-all-seen",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications", "mark-all-seen"]
+						}
+					}
+				},
+				{
+					"name": "Delete Notification",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/{{notificationId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications", "{{notificationId}}"]
+						}
+					}
+				},
+				{
+					"name": "Delete All Notifications",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications"]
+						}
+					}
+				},
+				{
+					"name": "Register Device",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"fcm_device_token_here\",\n  \"platform\": \"android\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/register-device",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications", "register-device"]
+						},
+						"description": "Platform: \"android\", \"ios\", or \"web\""
+					}
+				}
+			]
+		},
+		{
+			"name": "Truck",
+			"item": [
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "profile"]
+						}
+					}
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "FullName",
+									"value": "Updated Truck Account Name",
+									"type": "text"
+								},
+								{
+									"key": "PhoneNumber",
+									"value": "+201234567890",
+									"type": "text"
+								},
+								{
+									"key": "Avatar",
+									"type": "file",
+									"src": ""
+								},
+								{
+									"key": "NationalIdFrontImage",
+									"type": "file",
+									"src": ""
+								},
+								{
+									"key": "NationalIdBackImage",
+									"type": "file",
+									"src": ""
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "profile"]
+						}
+					}
+				},
+				{
+					"name": "Upload National ID",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "NationalIdFrontImage",
+									"type": "file",
+									"src": ""
+								},
+								{
+									"key": "NationalIdBackImage",
+									"type": "file",
+									"src": ""
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "id"]
+						}
+					}
+				},
+				{
+					"name": "Get Open Shipment Requests",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/shipments/open?filter.truckType=1&filter.truckBodyType=1&filter.minWeight=0.5&filter.maxWeight=10&filter.pickupLocationSearch=Cairo&filter.dropoffLocationSearch=Alexandria&filter.latitude=30.0444&filter.longitude=31.2357&filter.radiusKm=50&pageNumber=1&pageSize=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "shipments", "open"],
+							"query": [
+								{
+									"key": "filter.truckType",
+									"value": "1",
+									"description": "0=Small, 1=Medium, 2=Large (optional)"
+								},
+								{
+									"key": "filter.truckBodyType",
+									"value": "1",
+									"description": "0=Open, 1=Closed, 2=Refrigerated (optional)"
+								},
+								{
+									"key": "filter.minWeight",
+									"value": "0.5",
+									"description": "Min weight in tons (optional)"
+								},
+								{
+									"key": "filter.maxWeight",
+									"value": "10",
+									"description": "Max weight in tons (optional)"
+								},
+								{
+									"key": "filter.pickupLocationSearch",
+									"value": "Cairo",
+									"description": "Search pickup location (optional)"
+								},
+								{
+									"key": "filter.dropoffLocationSearch",
+									"value": "Alexandria",
+									"description": "Search dropoff location (optional)"
+								},
+								{
+									"key": "filter.latitude",
+									"value": "30.0444",
+									"description": "Driver latitude for near-me filter (optional)"
+								},
+								{
+									"key": "filter.longitude",
+									"value": "31.2357",
+									"description": "Driver longitude for near-me filter (optional)"
+								},
+								{
+									"key": "filter.radiusKm",
+									"value": "50",
+									"description": "Radius in km for near-me filter (optional)"
+								},
+								{
+									"key": "pageNumber",
+									"value": "1"
+								},
+								{
+									"key": "pageSize",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Shipment Request By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/requests/{{shipmentRequestId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "requests", "{{shipmentRequestId}}"]
+						}
+					}
+				},
+				{
+					"name": "Create Truck",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"truckType\": 1,\n  \"bodyType\": 1,\n  \"maxWeight\": 10.0,\n  \"plateNumber\": \"ABC-1234\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/trucks",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "trucks"]
+						},
+						"description": "TruckType: 0=Small, 1=Medium, 2=Large\nBodyType: 0=Open, 1=Closed, 2=Refrigerated"
+					}
+				},
+				{
+					"name": "Get My Trucks",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/trucks",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "trucks"]
+						}
+					}
+				},
+				{
+					"name": "Submit Offer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"shipmentRequestId\": \"{{shipmentRequestId}}\",\n  \"price\": 1500.00,\n  \"notes\": \"Can deliver within 24 hours\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/offers",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "offers"]
+						}
+					}
+				},
+				{
+					"name": "Get My Offers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/offers?pageNumber=1&pageSize=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "offers"],
+							"query": [
+								{
+									"key": "pageNumber",
+									"value": "1"
+								},
+								{
+									"key": "pageSize",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Assign Self to Shipment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"truckId\": \"{{truckId}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/shipments/{{shipmentId}}/assign-self",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "shipments", "{{shipmentId}}", "assign-self"]
+						}
+					}
+				},
+				{
+					"name": "Assign Driver to Shipment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"driverProfileId\": \"{{driverProfileId}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/shipments/{{shipmentId}}/assign-driver",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "shipments", "{{shipmentId}}", "assign-driver"]
+						}
+					}
+				},
+				{
+					"name": "Invite Driver to Shipment",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/shipments/{{shipmentId}}/invite-driver",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "shipments", "{{shipmentId}}", "invite-driver"]
+						}
+					}
+				},
+				{
+					"name": "Get Available Drivers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/drivers?pageNumber=1&pageSize=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "drivers"],
+							"query": [
+								{ "key": "pageNumber", "value": "1" },
+								{ "key": "pageSize", "value": "10" },
+								{ "key": "search", "value": "", "disabled": true }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Shipments",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/shipments?pageNumber=1&pageSize=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "shipments"],
+							"query": [
+								{
+									"key": "pageNumber",
+									"value": "1"
+								},
+								{
+									"key": "pageSize",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Shipment QR Code",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/truck/shipments/{{shipmentId}}/qr",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "truck", "shipments", "{{shipmentId}}", "qr"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

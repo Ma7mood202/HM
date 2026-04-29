@@ -63,7 +63,6 @@ deploy/
 
 # Reference / local
 SERVER-REFERENCE.md
-HM.postman_collection.json
 
 # Misc
 *.cache
