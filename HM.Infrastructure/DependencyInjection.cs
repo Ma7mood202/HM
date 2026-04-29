@@ -40,6 +40,8 @@ public static class DependencyInjection
         services.AddScoped<ICurrentProfileAccessor, CurrentProfileAccessor>();
         services.AddScoped<INotificationService, NotificationService>();
 
+        services.AddHostedService<PendingDriverAssignmentTimeoutService>();
+
         services.Configure<FirebaseOptions>(configuration.GetSection(FirebaseOptions.SectionName));
 
         return services;
