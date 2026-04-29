@@ -7,6 +7,7 @@ using HM.Application.Interfaces.Services;
 using HM.Domain.Entities;
 using HM.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HM.Infrastructure.Services;
 
@@ -19,12 +20,14 @@ public sealed class MerchantService : IMerchantService
     private readonly IApplicationDbContext _db;
     private readonly IMapper _mapper;
     private readonly INotificationService _notificationService;
+    private readonly ILogger<MerchantService> _logger;
 
-    public MerchantService(IApplicationDbContext db, IMapper mapper, INotificationService notificationService)
+    public MerchantService(IApplicationDbContext db, IMapper mapper, INotificationService notificationService, ILogger<MerchantService> logger)
     {
         _db = db;
         _mapper = mapper;
         _notificationService = notificationService;
+        _logger = logger;
     }
 
     public async Task<MerchantProfileResponse> GetMyProfileAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -605,9 +608,9 @@ public sealed class MerchantService : IMerchantService
                 true,
                 cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
-            // Don't fail the main flow if notification fails
+            _logger.LogWarning(ex, "Failed to notify merchant {MerchantUserId} of submitted shipment request; continuing without push", merchantUserId);
         }
     }
 
@@ -638,15 +641,15 @@ public sealed class MerchantService : IMerchantService
                         true,
                         cancellationToken);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Continue with other drivers
+                    _logger.LogWarning(ex, "Failed to notify driver {DriverUserId} of new shipment request {ShipmentRequestId}; continuing with other drivers", driverUserId, shipmentRequestId);
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Don't fail the main flow
+            _logger.LogWarning(ex, "Failed to fan out new-shipment-request notifications for {ShipmentRequestId}", shipmentRequestId);
         }
     }
 
@@ -665,9 +668,9 @@ public sealed class MerchantService : IMerchantService
                 true,
                 cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
-            // Don't fail the main flow
+            _logger.LogWarning(ex, "Failed to notify truck account {TruckAccountId} of accepted offer {OfferId} on request {ShipmentRequestId}", truckAccountId, offerId, shipmentRequestId);
         }
     }
 }

@@ -8,6 +8,7 @@ using HM.Application.Interfaces.Services;
 using HM.Domain.Entities;
 using HM.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HM.Infrastructure.Services;
 
@@ -19,12 +20,14 @@ public sealed class TruckService : ITruckService
     private readonly IApplicationDbContext _db;
     private readonly IMapper _mapper;
     private readonly INotificationService _notificationService;
+    private readonly ILogger<TruckService> _logger;
 
-    public TruckService(IApplicationDbContext db, IMapper mapper, INotificationService notificationService)
+    public TruckService(IApplicationDbContext db, IMapper mapper, INotificationService notificationService, ILogger<TruckService> logger)
     {
         _db = db;
         _mapper = mapper;
         _notificationService = notificationService;
+        _logger = logger;
     }
 
     public async Task<TruckProfileDto> GetMyProfileAsync(Guid truckUserId, CancellationToken cancellationToken = default)
@@ -409,9 +412,9 @@ public sealed class TruckService : ITruckService
                     true,
                     cancellationToken);
             }
-            catch
+            catch (Exception ex)
             {
-                // Non-fatal
+                _logger.LogWarning(ex, "Failed to notify driver (user {DriverUserId}) of assignment to shipment {ShipmentId}", driver.UserId.Value, shipment.Id);
             }
         }
 
