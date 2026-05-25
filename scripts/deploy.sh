@@ -159,16 +159,20 @@ for i in {1..30}; do
 done
 
 log "verifying $HEALTH_URL"
-# 30s max + 3 retries with 5s delay tolerates JIT-cold ASP.NET startup
+# 30s max + 5 retries with 5s delay tolerates JIT-cold ASP.NET startup
 # (loading EF context, SignalR hubs, Firebase SDK). curl --retry retries
 # automatically on 5xx/timeouts so transient startup errors don't fail us.
+# --retry-connrefused is required because systemd reports the service
+# "active" before Kestrel actually binds to the port — the first attempts
+# often hit a connection-refused upstream behind nginx, and without this
+# flag curl bails out on the very first attempt instead of retrying.
 # We capture the final HTTP status explicitly rather than relying on -f, so
 # the success path can log the actual code (helps catch silent regressions
 # like a redirect to /swagger sneaking in) and the failure path reports
 # what we actually got. -s silences retry diagnostics; "000" means curl
 # couldn't reach the server at all (connection refused, DNS, timeout).
 HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-  --max-time 30 --retry 3 --retry-delay 5 \
+  --max-time 30 --retry 5 --retry-delay 5 --retry-connrefused \
   "$HEALTH_URL" || echo "000")
 if [[ "$HEALTH_STATUS" != "200" ]]; then
   rollback
@@ -207,7 +211,7 @@ if [[ -d "$ADMIN_DEPLOY_DIR" ]]; then
 
   log "verifying admin health at $ADMIN_HEALTH_URL"
   ADMIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-    --max-time 30 --retry 3 --retry-delay 5 \
+    --max-time 30 --retry 5 --retry-delay 5 --retry-connrefused \
     "$ADMIN_HEALTH_URL" || echo "000")
   if [[ "$ADMIN_STATUS" != "200" ]]; then
     log "WARN: admin health-check returned HTTP $ADMIN_STATUS (expected 200); API is unaffected"
