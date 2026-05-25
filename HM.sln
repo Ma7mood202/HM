@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HM.Infrastructure", "HM.Inf
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hm.WebApi", "Hm.WebApi\Hm.WebApi.csproj", "{0C9AB8F1-A0ED-4A57-9E53-AC19ED1AC6CF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HM.AdminPanel", "HM.AdminPanel\HM.AdminPanel.csproj", "{44909C86-5199-4B0E-9CA1-7356CC19265E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{0C9AB8F1-A0ED-4A57-9E53-AC19ED1AC6CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0C9AB8F1-A0ED-4A57-9E53-AC19ED1AC6CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0C9AB8F1-A0ED-4A57-9E53-AC19ED1AC6CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{44909C86-5199-4B0E-9CA1-7356CC19265E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{44909C86-5199-4B0E-9CA1-7356CC19265E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{44909C86-5199-4B0E-9CA1-7356CC19265E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{44909C86-5199-4B0E-9CA1-7356CC19265E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
