@@ -1,0 +1,17 @@
+@model List<HM.AdminPanel.ViewModels.ShipmentRequests.ShipmentRequestListItemVm>
+
+<table class="table table-striped">
+    <thead><tr><th>Request #</th><th>Status</th><th>Merchant Profile</th><th>Created</th><th>Offers</th></tr></thead>
+    <tbody>
+        @foreach (var r in Model)
+        {
+            <tr>
+                <td>@r.RequestNumber</td>
+                <td>@r.Status</td>
+                <td><code>@r.MerchantProfileId</code></td>
+                <td>@r.CreatedAt.ToString("u")</td>
+                <td>@r.OffersCount</td>
+            </tr>
+        }
+    </tbody>
+</table>

@@ -1,0 +1,52 @@
+@model HM.AdminPanel.ViewModels.Shipments.ShipmentDetailVm
+@using HM.Domain.Enums
+
+<div class="card"><div class="card-body">
+    <dl class="row">
+        <dt class="col-sm-3">Status</dt>      <dd class="col-sm-9">@Model.Status</dd>
+        <dt class="col-sm-3">Started</dt>     <dd class="col-sm-9">@Model.StartedAt?.ToString("u")</dd>
+        <dt class="col-sm-3">Completed</dt>   <dd class="col-sm-9">@Model.CompletedAt?.ToString("u")</dd>
+        <dt class="col-sm-3">Truck</dt>       <dd class="col-sm-9"><code>@Model.TruckId</code></dd>
+        <dt class="col-sm-3">Driver</dt>      <dd class="col-sm-9">@(Model.DriverProfileId?.ToString() ?? "—")</dd>
+        <dt class="col-sm-3">Current loc</dt> <dd class="col-sm-9">@(Model.CurrentLat),@(Model.CurrentLng) @(Model.LocationUpdatedAt?.ToString("u"))</dd>
+    </dl>
+</div></div>
+
+@section Head { <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /> }
+
+@if (Model.CurrentLat.HasValue && Model.CurrentLng.HasValue)
+{
+    <div id="map" style="height:400px;" class="mt-3"></div>
+}
+
+<div class="mt-3 d-flex" style="gap:8px;">
+    @if (Model.Status != ShipmentStatus.Completed && Model.Status != ShipmentStatus.Cancelled)
+    {
+        <form method="post" asp-action="Cancel" asp-route-id="@Model.Id" data-confirm="Cancel this shipment?" class="d-flex" style="gap:6px;">
+            @Html.AntiForgeryToken()
+            <input name="reason" class="form-control" placeholder="Reason" />
+            <button class="btn btn-danger">Cancel</button>
+        </form>
+
+        <form method="post" asp-action="Reassign" asp-route-id="@Model.Id" data-confirm="Reassign driver?" class="d-flex" style="gap:6px;">
+            @Html.AntiForgeryToken()
+            <input name="newDriverId" class="form-control" placeholder="New driver Guid" />
+            <button class="btn btn-warning">Reassign</button>
+        </form>
+    }
+</div>
+
+@section Scripts {
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    @if (Model.CurrentLat.HasValue && Model.CurrentLng.HasValue)
+    {
+        <text>
+        <script>
+            const lat = @Model.CurrentLat, lng = @Model.CurrentLng;
+            const map = L.map('map').setView([lat, lng], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
+            L.marker([lat, lng]).addTo(map);
+        </script>
+        </text>
+    }
+}
