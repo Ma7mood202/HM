@@ -11,4 +11,8 @@ public class Truck
     public decimal MaxWeight { get; set; }
     public string PlateNumber { get; set; } = string.Empty;
     public bool IsActive { get; set; }
+
+    // Admin-panel additions
+    public TruckApprovalStatus ApprovalStatus { get; set; }
+    public string? RejectionReason { get; set; }
 }
