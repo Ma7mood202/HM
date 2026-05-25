@@ -15,4 +15,9 @@ public class User
     public DateTime? OtpExpiresAt { get; set; }
     public OtpPurpose OtpPurpose { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    // Admin-panel additions
+    public bool      IsBlocked     { get; set; }
+    public DateTime? BlockedAt     { get; set; }
+    public string?   BlockedReason { get; set; }
 }
