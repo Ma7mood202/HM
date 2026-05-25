@@ -1,0 +1,43 @@
+@model HM.AdminPanel.ViewModels.Trucks.TruckListVm
+@using HM.Domain.Enums
+
+<form method="get" class="card card-body mb-3">
+    <div class="row">
+        <div class="col-md-4">
+            <input asp-for="Filter.Search" class="form-control" placeholder="Plate / owner name / phone" />
+        </div>
+        <div class="col-md-3">
+            <select asp-for="Filter.Status" class="form-control">
+                <option value="">— status —</option>
+                @foreach (var s in Enum.GetValues<TruckApprovalStatus>())
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2"><button class="btn btn-primary">Search</button></div>
+    </div>
+</form>
+
+<table class="table table-striped">
+    <thead><tr><th>Plate</th><th>Type</th><th>Body</th><th>Weight</th><th>Owner</th><th>Status</th><th>Active</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var t in Model.Result.Items)
+        {
+            <tr>
+                <td>@t.PlateNumber</td>
+                <td>@t.TruckType</td>
+                <td>@t.BodyType</td>
+                <td>@t.MaxWeight</td>
+                <td>@t.OwnerName</td>
+                <td>@t.ApprovalStatus</td>
+                <td>@(t.IsActive ? "Yes" : "No")</td>
+                <td><a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@t.Id">Open</a></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@{ var pager = new HM.AdminPanel.ViewModels.Common.PagedResult<object>
+   { Page = Model.Result.Page, PageSize = Model.Result.PageSize, Total = Model.Result.Total }; }
+@await Html.PartialAsync("_Pager", pager)

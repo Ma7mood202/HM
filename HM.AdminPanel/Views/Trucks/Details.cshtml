@@ -1,0 +1,39 @@
+@model HM.AdminPanel.ViewModels.Trucks.TruckDetailVm
+@using HM.Domain.Enums
+
+<div class="card"><div class="card-body">
+    <dl class="row">
+        <dt class="col-sm-3">Plate</dt>    <dd class="col-sm-9">@Model.PlateNumber</dd>
+        <dt class="col-sm-3">Type</dt>     <dd class="col-sm-9">@Model.TruckType / @Model.BodyType</dd>
+        <dt class="col-sm-3">Max weight</dt><dd class="col-sm-9">@Model.MaxWeight</dd>
+        <dt class="col-sm-3">Owner</dt>    <dd class="col-sm-9">@Model.OwnerName (<code>@Model.TruckAccountId</code>)</dd>
+        <dt class="col-sm-3">Status</dt>   <dd class="col-sm-9">@Model.ApprovalStatus @(Model.RejectionReason is null ? "" : $"— {Model.RejectionReason}")</dd>
+        <dt class="col-sm-3">Active</dt>   <dd class="col-sm-9">@(Model.IsActive ? "Yes" : "No")</dd>
+        <dt class="col-sm-3">Shipments</dt><dd class="col-sm-9">@Model.ShipmentsCount</dd>
+    </dl>
+</div></div>
+
+<div class="mt-3 d-flex" style="gap:8px;">
+    @if (Model.ApprovalStatus != TruckApprovalStatus.Approved)
+    {
+        <form method="post" asp-action="Approve" asp-route-id="@Model.Id" data-confirm="Approve truck?">
+            @Html.AntiForgeryToken()
+            <button class="btn btn-success">Approve</button>
+        </form>
+    }
+    @if (Model.ApprovalStatus != TruckApprovalStatus.Rejected)
+    {
+        <form method="post" asp-action="Reject" asp-route-id="@Model.Id" data-confirm="Reject truck?" class="d-flex" style="gap:6px;">
+            @Html.AntiForgeryToken()
+            <input name="reason" class="form-control" placeholder="Reason" />
+            <button class="btn btn-danger">Reject</button>
+        </form>
+    }
+    @if (Model.IsActive)
+    {
+        <form method="post" asp-action="Suspend" asp-route-id="@Model.Id" data-confirm="Suspend truck?">
+            @Html.AntiForgeryToken()
+            <button class="btn btn-warning">Suspend</button>
+        </form>
+    }
+</div>
