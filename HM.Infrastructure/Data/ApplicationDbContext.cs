@@ -32,6 +32,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<DriverInvitation> DriverInvitations => Set<DriverInvitation>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<FcmDeviceToken> FcmDeviceTokens => Set<FcmDeviceToken>();
+    public DbSet<AdminAuditLog>     AdminAuditLogs     => Set<AdminAuditLog>();
+    public DbSet<AdminLoginAttempt> AdminLoginAttempts => Set<AdminLoginAttempt>();
+    public DbSet<AppSetting>        AppSettings        => Set<AppSetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
