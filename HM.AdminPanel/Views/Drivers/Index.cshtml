@@ -1,0 +1,40 @@
+@model HM.AdminPanel.ViewModels.Drivers.DriverListVm
+
+<form method="get" class="card card-body mb-3">
+    <div class="row">
+        <div class="col-md-5">
+            <input asp-for="Filter.Search" class="form-control" placeholder="Search name / phone / email" />
+        </div>
+        <div class="col-md-3">
+            <select asp-for="Filter.IsBlocked" class="form-control">
+                <option value="">— blocked? —</option>
+                <option value="true">Blocked</option>
+                <option value="false">Not blocked</option>
+            </select>
+        </div>
+        <div class="col-md-2"><button class="btn btn-primary">Search</button></div>
+    </div>
+</form>
+
+<table class="table table-striped">
+    <thead><tr>
+        <th>Name</th><th>Phone</th><th>Email</th>
+        <th>Active</th><th>Blocked</th><th>Created</th><th></th>
+    </tr></thead>
+    <tbody>
+        @foreach (var d in Model.Result.Items)
+        {
+            <tr>
+                <td>@d.FullName</td><td>@d.PhoneNumber</td><td>@d.Email</td>
+                <td>@(d.IsActive ? "Yes" : "No")</td>
+                <td>@(d.IsBlocked ? "Yes" : "No")</td>
+                <td>@d.CreatedAt.ToString("u")</td>
+                <td><a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@d.Id">Open</a></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@{ var pager = new HM.AdminPanel.ViewModels.Common.PagedResult<object>
+   { Page = Model.Result.Page, PageSize = Model.Result.PageSize, Total = Model.Result.Total }; }
+@await Html.PartialAsync("_Pager", pager)
