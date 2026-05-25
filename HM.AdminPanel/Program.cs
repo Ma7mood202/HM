@@ -1,7 +1,9 @@
 using HM.AdminPanel.Authorization;
 using HM.AdminPanel.Extensions;
 using HM.Infrastructure;
+using HM.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +19,13 @@ builder.Services.AddControllersWithViews(options =>
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await db.Database.MigrateAsync();
+    await DbSeeder.SeedAsync(scope.ServiceProvider);
+}
 
 if (!app.Environment.IsDevelopment())
 {

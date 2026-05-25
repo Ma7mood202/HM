@@ -8,7 +8,15 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddAdminAuth(this IServiceCollection services)
     {
-        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+        services.AddAuthentication(o =>
+            {
+                o.DefaultScheme             = CookieAuthenticationDefaults.AuthenticationScheme;
+                o.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                o.DefaultChallengeScheme    = CookieAuthenticationDefaults.AuthenticationScheme;
+                o.DefaultSignInScheme       = CookieAuthenticationDefaults.AuthenticationScheme;
+                o.DefaultSignOutScheme      = CookieAuthenticationDefaults.AuthenticationScheme;
+                o.DefaultForbidScheme       = CookieAuthenticationDefaults.AuthenticationScheme;
+            })
             .AddCookie(o =>
             {
                 o.LoginPath        = "/Account/Login";
@@ -18,7 +26,7 @@ public static class ServiceCollectionExtensions
                 o.SlidingExpiration = true;
                 o.Cookie.Name       = "HM.Admin";
                 o.Cookie.HttpOnly   = true;
-                o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
                 o.Cookie.SameSite   = SameSiteMode.Lax;
             });
 
