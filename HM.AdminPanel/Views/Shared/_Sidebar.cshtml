@@ -1,0 +1,30 @@
+@using HM.AdminPanel.Authorization
+@{
+    var canWrite = User.IsInRole(AdminRoles.SuperAdmin) || User.IsInRole(AdminRoles.Support);
+    var isSuper  = User.IsInRole(AdminRoles.SuperAdmin);
+}
+<aside class="main-sidebar sidebar-dark-primary elevation-4">
+    <a href="/" class="brand-link">
+        <span class="brand-text font-weight-light">HM Admin</span>
+    </a>
+    <div class="sidebar">
+        <nav class="mt-2">
+            <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu">
+                <li class="nav-item">
+                    <a href="/Dashboard" class="nav-link"><i class="nav-icon fas fa-tachometer-alt"></i><p>Dashboard</p></a>
+                </li>
+                <li class="nav-item">
+                    <a href="/Dashboard/LiveMap" class="nav-link"><i class="nav-icon fas fa-map"></i><p>Live Map</p></a>
+                </li>
+                <li class="nav-header">USERS</li>
+                <li class="nav-item"><a href="/Merchants" class="nav-link"><i class="nav-icon fas fa-store"></i><p>Merchants</p></a></li>
+                <li class="nav-item"><a href="/Drivers" class="nav-link"><i class="nav-icon fas fa-id-card"></i><p>Drivers</p></a></li>
+                <li class="nav-item"><a href="/TruckAccounts" class="nav-link"><i class="nav-icon fas fa-users-cog"></i><p>Truck Accounts</p></a></li>
+                <li class="nav-header">OPERATIONS</li>
+                <li class="nav-item"><a href="/Trucks" class="nav-link"><i class="nav-icon fas fa-truck"></i><p>Trucks</p></a></li>
+                <li class="nav-item"><a href="/Shipments" class="nav-link"><i class="nav-icon fas fa-box"></i><p>Shipments</p></a></li>
+                <li class="nav-item"><a href="/ShipmentRequests" class="nav-link"><i class="nav-icon fas fa-clipboard-list"></i><p>Shipment Requests</p></a></li>
+            </ul>
+        </nav>
+    </div>
+</aside>

@@ -1,0 +1,26 @@
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model HM.AdminPanel.ViewModels.Common.PagedResult<object>
+@{
+    var currentPage = Model.Page;
+    var totalPages  = Model.TotalPages;
+    var ctx         = HttpContextAccessor.HttpContext!;
+
+    string BuildUrl(int p)
+    {
+        var others = ctx.Request.Query.Where(kv => kv.Key != "page");
+        var parts  = others.Select(kv => kv.Key + "=" + kv.Value).ToList();
+        parts.Add("page=" + p);
+        return ctx.Request.Path + "?" + string.Join("&", parts);
+    }
+}
+<nav>
+  <ul class="pagination">
+    <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
+      <a class="page-link" href="@BuildUrl(currentPage - 1)">Prev</a>
+    </li>
+    <li class="page-item disabled"><span class="page-link">@currentPage / @totalPages</span></li>
+    <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+      <a class="page-link" href="@BuildUrl(currentPage + 1)">Next</a>
+    </li>
+  </ul>
+</nav>
