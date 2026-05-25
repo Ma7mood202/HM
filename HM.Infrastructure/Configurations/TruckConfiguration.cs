@@ -34,5 +34,13 @@ public class TruckConfiguration : IEntityTypeConfiguration<Truck>
 
         builder.Property(t => t.IsActive)
             .IsRequired();
+
+        builder.Property(t => t.ApprovalStatus)
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .IsRequired()
+            .HasDefaultValue(TruckApprovalStatus.Pending);
+
+        builder.Property(t => t.RejectionReason).HasMaxLength(512);
     }
 }
