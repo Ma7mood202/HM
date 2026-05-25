@@ -1,27 +1,44 @@
+using HM.AdminPanel.Authorization;
+using HM.AdminPanel.Extensions;
+using HM.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddControllersWithViews();
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddAdminAuth();
+builder.Services.AddAdminServices();
+
+builder.Services.AddControllersWithViews(options =>
+{
+    options.Filters.AddService<AuditActionFilter>();
+    options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseExceptionHandler("/Error/500");
     app.UseHsts();
 }
+app.UseStatusCodePagesWithReExecute("/Error/{0}");
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
-
+app.UseAuthentication();
 app.UseAuthorization();
+
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers["Cache-Control"] = "no-store";
+    await next();
+});
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+    pattern: "{controller=Dashboard}/{action=Index}/{id?}");
 
 app.Run();
