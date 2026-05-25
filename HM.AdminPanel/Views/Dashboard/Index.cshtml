@@ -1,0 +1,77 @@
+@model HM.AdminPanel.ViewModels.Dashboard.DashboardVm
+
+<div class="row">
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-info">
+            <div class="inner"><h3>@Model.TotalMerchants</h3><p>Merchants</p></div>
+            <div class="icon"><i class="fas fa-store"></i></div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-success">
+            <div class="inner"><h3>@Model.TotalDrivers</h3><p>Drivers</p></div>
+            <div class="icon"><i class="fas fa-id-card"></i></div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-warning">
+            <div class="inner"><h3>@Model.TotalTrucks</h3><p>Trucks</p></div>
+            <div class="icon"><i class="fas fa-truck"></i></div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-danger">
+            <div class="inner"><h3>@Model.ActiveShipments</h3><p>Active shipments</p></div>
+            <div class="icon"><i class="fas fa-box"></i></div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card"><div class="card-header"><h3 class="card-title">Shipments — last 30 days</h3></div>
+            <div class="card-body"><canvas id="chartDaily" height="120"></canvas></div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card"><div class="card-header"><h3 class="card-title">By status</h3></div>
+            <div class="card-body"><canvas id="chartStatus" height="200"></canvas></div></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3 class="card-title">Recent activity</h3></div>
+    <div class="card-body p-0">
+        <table class="table table-striped">
+            <thead><tr><th>When</th><th>Kind</th><th>Title</th><th>Detail</th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.RecentActivity)
+            {
+                <tr><td>@r.At.ToString("u")</td><td>@r.Kind</td><td>@r.Title</td><td>@r.Subtitle</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const daily = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Last30Days));
+    const byStatus = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ShipmentsByStatus));
+
+    new Chart(document.getElementById('chartDaily').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: daily.map(d => d.day),
+            datasets: [{ label: 'Shipments', data: daily.map(d => d.count), borderWidth: 2 }]
+        }
+    });
+
+    new Chart(document.getElementById('chartStatus').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: byStatus.map(s => s.status),
+            datasets: [{ data: byStatus.map(s => s.count) }]
+        }
+    });
+</script>
+}

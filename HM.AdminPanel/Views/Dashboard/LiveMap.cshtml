@@ -1,0 +1,38 @@
+@model HM.AdminPanel.ViewModels.Dashboard.LiveMapVm
+
+@section Head {
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+}
+
+<div id="map" style="height:600px;"></div>
+
+@section Scripts {
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8/dist/browser/signalr.min.js"></script>
+    <script>
+        const initial = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Pins));
+        const map = L.map('map').setView([30.05, 31.25], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
+
+        const markers = new Map();
+        function upsert(id, lat, lng, status) {
+            if (lat == null || lng == null) return;
+            if (markers.has(id)) {
+                markers.get(id).setLatLng([lat, lng]).setPopupContent(id + '<br>' + status);
+            } else {
+                markers.set(id, L.marker([lat, lng]).addTo(map).bindPopup(id + '<br>' + status));
+            }
+        }
+        initial.forEach(p => upsert(p.shipmentId, p.lat, p.lng, p.status));
+
+        const hubUrl = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.HubUrl));
+        if (hubUrl) {
+            const conn = new signalR.HubConnectionBuilder().withUrl(hubUrl).withAutomaticReconnect().build();
+            conn.on('LocationUpdated', function (payload) {
+                upsert(payload.shipmentId, payload.lat, payload.lng, payload.status || 'InProgress');
+            });
+            conn.start().catch(err => console.error(err));
+        }
+    </script>
+}
