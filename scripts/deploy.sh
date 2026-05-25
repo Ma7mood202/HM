@@ -176,6 +176,50 @@ if [[ "$HEALTH_STATUS" != "200" ]]; then
 fi
 log "health-check OK (HTTP $HEALTH_STATUS)"
 
+# 11. Publish + restart HM.AdminPanel. Independent of the API: failures here
+# do NOT roll back the API (it's already healthy). We do best-effort restart
+# and log loudly if it doesn't come up.
+readonly ADMIN_DEPLOY_DIR="/var/www/hm-admin"
+readonly ADMIN_SERVICE_NAME="hm-admin"
+readonly ADMIN_HEALTH_URL="http://127.0.0.1:5050/Account/Login"
+if [[ -d "$ADMIN_DEPLOY_DIR" ]]; then
+  readonly ADMIN_STAGING_DIR="$(mktemp -d -t hm-admin-publish-XXXXXX)"
+  chmod 755 "$ADMIN_STAGING_DIR"
+  log "publishing HM.AdminPanel to $ADMIN_STAGING_DIR"
+  dotnet publish "$SOURCE_DIR/HM.AdminPanel/HM.AdminPanel.csproj" \
+    -c Release \
+    -o "$ADMIN_STAGING_DIR" \
+    --nologo \
+    -v minimal \
+    /nodeReuse:false
+
+  log "stopping $ADMIN_SERVICE_NAME"
+  systemctl stop "$ADMIN_SERVICE_NAME" 2>/dev/null || true
+
+  log "syncing admin staging -> $ADMIN_DEPLOY_DIR"
+  rsync -a --delete \
+    --exclude='appsettings.json' \
+    "$ADMIN_STAGING_DIR/" "$ADMIN_DEPLOY_DIR/"
+  chmod 755 "$ADMIN_DEPLOY_DIR"
+
+  log "starting $ADMIN_SERVICE_NAME"
+  systemctl start "$ADMIN_SERVICE_NAME" || log "WARN: $ADMIN_SERVICE_NAME failed to start; check journalctl -u $ADMIN_SERVICE_NAME"
+
+  log "verifying admin health at $ADMIN_HEALTH_URL"
+  ADMIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+    --max-time 30 --retry 3 --retry-delay 5 \
+    "$ADMIN_HEALTH_URL" || echo "000")
+  if [[ "$ADMIN_STATUS" != "200" ]]; then
+    log "WARN: admin health-check returned HTTP $ADMIN_STATUS (expected 200); API is unaffected"
+  else
+    log "admin health-check OK (HTTP $ADMIN_STATUS)"
+  fi
+
+  rm -rf "$ADMIN_STAGING_DIR"
+else
+  log "skipping HM.AdminPanel deploy: $ADMIN_DEPLOY_DIR does not exist (first-time setup required)"
+fi
+
 # Shut down dotnet build servers (MSBuild + VBCSCompiler + Razor). They inherit
 # the flock lock fd and would block subsequent deploys. The MSBUILDDISABLENODEREUSE
 # env var prevents MSBuild reuse but does NOT cover VBCSCompiler.
