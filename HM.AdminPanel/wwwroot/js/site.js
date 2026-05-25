@@ -1,4 +1,20 @@
-﻿// Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
-// for details on configuring this project to bundle and minify static web assets.
+(function () {
+    document.addEventListener('DOMContentLoaded', function () {
+        var s = document.getElementById('flash-success')?.innerText;
+        var e = document.getElementById('flash-error')?.innerText;
+        if (s && window.Swal) Swal.fire({ icon: 'success', title: s, timer: 2500, showConfirmButton: false });
+        if (e && window.Swal) Swal.fire({ icon: 'error', title: e });
 
-// Write your JavaScript code.
+        document.querySelectorAll('form[data-confirm]').forEach(function (form) {
+            form.addEventListener('submit', function (ev) {
+                ev.preventDefault();
+                Swal.fire({
+                    title: form.getAttribute('data-confirm'),
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes',
+                }).then(function (r) { if (r.isConfirmed) form.submit(); });
+            });
+        });
+    });
+})();
